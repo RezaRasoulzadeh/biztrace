@@ -1,0 +1,85 @@
+// ui/components/rtl_select.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlSelect inherits Rectangle {
+    in property <[string]> model;
+    in-out property <int> current-index: 0;
+    out property <string> current-value: root.model.length > 0 ? root.model[root.current-index] : "";
+    callback selected(string);
+    min-height: 34px;
+    min-width: 120px;
+    background: NexoraTheme.control;
+    border-color: touch.has-hover ? NexoraTheme.brand : NexoraTheme.border;
+    border-width: 1px;
+    border-radius: 6px;
+    accessible-role: combobox;
+    accessible-label: root.current-value;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 10px;
+
+        Text {
+            width: 14px;
+            text: "⌄";
+            color: NexoraTheme.text-muted;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+        RtlText {
+            horizontal-stretch: 1;
+            text: root.current-value;
+            wrap: no-wrap;
+            overflow: elide;
+        }
+    }
+
+    touch := TouchArea { clicked => { popup.show(); } }
+
+    popup := PopupWindow {
+        x: 0;
+        y: root.height + 4px;
+        width: root.width;
+        height: root.model.length * 38px + 8px;
+        close-policy: close-on-click-outside;
+
+        Rectangle {
+            background: NexoraTheme.control;
+            border-color: NexoraTheme.border;
+            border-width: 1px;
+            border-radius: 7px;
+
+            VerticalLayout {
+                padding: 4px;
+
+                for option[index] in root.model : Rectangle {
+                    height: 38px;
+                    background: option-touch.has-hover || index == root.current-index ? NexoraTheme.control-hover : transparent;
+                    border-radius: 5px;
+
+                    RtlText {
+                        x: 10px;
+                        width: parent.width - 20px;
+                        height: parent.height;
+                        text: option;
+                        wrap: no-wrap;
+                        overflow: elide;
+                    }
+
+                    option-touch := TouchArea {
+                        clicked => {
+                            root.current-index = index;
+                            root.selected(option);
+                            popup.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,131 @@
+// ui/app.slint
+
+import {
+    NexoraTheme,
+    ProductRow,
+    RtlButton,
+    RtlCard,
+    RtlHeading,
+    RtlSelectField,
+    RtlTableHeaderCell,
+    RtlText,
+    RtlTextField,
+    RtlToast
+} from "components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    title: "Nexora — Slint RTL Components Test";
+    width: 920px;
+    height: 740px;
+    background: NexoraTheme.canvas;
+    default-font-family: NexoraTheme.font-family;
+
+    in-out property <string> customer-name;
+    in-out property <string> phone-number;
+    in-out property <string> status-message: "آماده برای آزمایش ورودی و چیدمان راست‌به‌چپ";
+    callback submit;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+
+        VerticalLayout {
+            padding: root.width < 620px ? 14px : 28px;
+            spacing: root.width < 620px ? 14px : 18px;
+
+            RtlHeading { text: "آزمون مؤلفه‌های راست‌به‌چپ Nexora"; }
+
+            RtlText {
+                text: "تایپ فارسی، انتخاب با ماوس، کلیدهای جهت، Home/End، حذف و ترکیب فارسی با اعداد و انگلیسی را آزمایش کنید";
+                color: NexoraTheme.text-muted;
+            }
+
+            RtlCard {
+                height: root.width < 620px ? 352px : 220px;
+
+                VerticalLayout {
+                    padding: 18px;
+                    spacing: 12px;
+
+                    RtlTextField {
+                        label: "نام مشتری:";
+                        text <=> root.customer-name;
+                        placeholder-text: "نام مشتری را وارد کنید";
+                    }
+
+                    RtlTextField {
+                        label: "شماره تلفن:";
+                        text <=> root.phone-number;
+                        placeholder-text: "۰۹۱۲۳۴۵۶۷۸۹";
+                    }
+
+                    RtlSelectField {
+                        label: "نقش:";
+                        model: ["مدیر کل", "مدیر فروش", "کارمند"];
+                    }
+
+                    RtlButton {
+                        text: "ثبت آزمایشی";
+                        clicked => {
+                            root.submit();
+                            toast.open = true;
+                        }
+                    }
+                }
+            }
+
+            RtlText {
+                text: "متن ترکیبی — کالا: چای احمد  |  کد: SKU-1001  |  تلفن: +98 912 345 6789";
+                height: 38px;
+                wrap: no-wrap;
+                overflow: elide;
+            }
+
+            RtlHeading { text: "لیست کالاها"; }
+
+            HorizontalLayout {
+                height: 30px;
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: root.width < 500px ? 10px : 18px;
+
+                RtlTableHeaderCell { width: root.width < 500px ? 54px : 80px; text: "موجودی"; }
+                if root.width >= 500px : RtlTableHeaderCell { width: 150px; text: "قیمت (ریال)"; }
+                if root.width >= 680px : RtlTableHeaderCell { width: 130px; text: "کد کالا"; }
+                RtlTableHeaderCell { horizontal-stretch: 1; text: "نام کالا"; }
+            }
+
+            ProductRow {
+                product-name: "چای احمد ۵۰۰ گرمی";
+                sku: "SKU-1001";
+                price: "1,250,000 ریال";
+                stock: "42";
+                compact: root.width < 680px;
+                narrow: root.width < 500px;
+            }
+            ProductRow {
+                product-name: "برنج طارم درجه یک";
+                sku: "SKU-1002";
+                price: "4,800,000 ریال";
+                stock: "15";
+                compact: root.width < 680px;
+                narrow: root.width < 500px;
+            }
+            ProductRow {
+                product-name: "روغن آفتابگردان";
+                sku: "SKU-1003";
+                price: "980,000 ریال";
+                stock: "0";
+                compact: root.width < 680px;
+                narrow: root.width < 500px;
+            }
+        }
+    }
+
+    toast := RtlToast {
+        x: max(16px, parent.width - self.width - 24px);
+        width: min(420px, parent.width - 32px);
+        message: root.status-message;
+    }
+}

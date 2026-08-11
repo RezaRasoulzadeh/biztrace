@@ -1,0 +1,40 @@
+// ui/components/rtl_select_field.slint
+
+import { RtlLabel } from "rtl_label.slint";
+import { RtlSelect } from "rtl_select.slint";
+
+export component RtlSelectField inherits Rectangle {
+    in property <string> label;
+    in property <[string]> model;
+    in-out property <int> current-index;
+    callback selected(string);
+    min-height: root.width < 520px ? 78px : 34px;
+
+    if root.width >= 520px : HorizontalLayout {
+        spacing: 12px;
+
+        RtlSelect {
+            horizontal-stretch: 1;
+            model: root.model;
+            current-index <=> root.current-index;
+            selected(value) => { root.selected(value); }
+        }
+        RtlLabel { text: root.label; }
+    }
+
+    if root.width < 520px : VerticalLayout {
+        spacing: 6px;
+
+        RtlLabel {
+            width: parent.width;
+            height: 28px;
+            text: root.label;
+        }
+        RtlSelect {
+            height: 38px;
+            model: root.model;
+            current-index <=> root.current-index;
+            selected(value) => { root.selected(value); }
+        }
+    }
+}

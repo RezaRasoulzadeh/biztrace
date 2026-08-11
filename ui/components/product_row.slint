@@ -1,0 +1,30 @@
+// ui/components/product_row.slint
+
+import { LtrTableCell } from "ltr_table_cell.slint";
+import { RtlTableRow } from "rtl_table_row.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component ProductRow inherits RtlTableRow {
+    in property <string> product-name;
+    in property <string> sku;
+    in property <string> price;
+    in property <string> stock;
+    in property <bool> compact;
+    in property <bool> narrow;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: root.narrow ? 10px : 18px;
+
+        LtrTableCell { width: root.narrow ? 54px : 80px; text: root.stock; }
+        if !root.narrow : LtrTableCell { width: 150px; text: root.price; }
+        if !root.compact : LtrTableCell { width: 130px; text: root.sku; }
+        RtlText {
+            horizontal-stretch: 1;
+            text: root.product-name;
+            wrap: no-wrap;
+            overflow: elide;
+        }
+    }
+}

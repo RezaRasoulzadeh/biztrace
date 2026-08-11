@@ -1,0 +1,11 @@
+// ui/components/ltr_table_cell.slint
+
+import { NexoraTheme } from "theme.slint";
+
+export component LtrTableCell inherits Text {
+    horizontal-alignment: right;
+    vertical-alignment: center;
+    color: NexoraTheme.text;
+    font-size: 14px;
+    overflow: elide;
+}

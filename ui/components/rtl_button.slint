@@ -1,0 +1,28 @@
+// ui/components/rtl_button.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlButton inherits Rectangle {
+    in property <string> text;
+    callback clicked;
+    min-height: 36px;
+    background: touch.pressed ? NexoraTheme.brand-pressed : touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand;
+    border-radius: 7px;
+    accessible-role: button;
+    accessible-label: root.text;
+
+    RtlText {
+        x: 12px;
+        width: parent.width - 24px;
+        height: parent.height;
+        text: root.text;
+        color: white;
+        horizontal-alignment: center;
+        font-weight: 600;
+        wrap: no-wrap;
+        overflow: elide;
+    }
+
+    touch := TouchArea { clicked => { root.clicked(); } }
+}

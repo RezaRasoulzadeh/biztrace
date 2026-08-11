@@ -1,0 +1,106 @@
+// ui/components/rtl_line_edit.slint
+
+import { NexoraTheme } from "theme.slint";
+
+export component RtlLineEdit inherits Rectangle {
+    in property <bool> enabled: true;
+    in property <bool> read-only: false;
+    in property <InputType> input-type: InputType.text;
+    in property <string> placeholder-text;
+    in-out property <string> text;
+    out property <bool> has-focus: input.has-focus;
+    callback accepted(string);
+    callback edited(string);
+    min-height: 34px;
+    min-width: 120px;
+    background: root.enabled ? input.has-focus ? NexoraTheme.control-hover : NexoraTheme.control : NexoraTheme.surface-raised;
+    border-width: 0px;
+    border-radius: 6px;
+    clip: true;
+    forward-focus: input;
+    accessible-role: text-input;
+    accessible-enabled: root.enabled;
+    accessible-value: root.text;
+    accessible-placeholder-text: root.placeholder-text;
+    accessible-read-only: root.read-only;
+
+    Rectangle {
+        x: 0;
+        y: parent.height - self.height;
+        width: parent.width;
+        height: input.has-focus ? 3px : 1px;
+        background: input.has-focus ? NexoraTheme.brand : NexoraTheme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+
+        if !root.text.is-empty && root.enabled && !root.read-only : Rectangle {
+            width: 18px;
+
+            Text {
+                text: "×";
+                color: clear-touch.has-hover ? NexoraTheme.text : NexoraTheme.text-muted;
+                font-size: 20px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            clear-touch := TouchArea {
+                clicked => {
+                    root.text = "";
+                    root.edited(root.text);
+                    input.focus();
+                }
+            }
+        }
+
+        text-area := Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            Text {
+                width: parent.width;
+                height: parent.height;
+                text: root.text.is-empty && input.preedit-text.is-empty ? root.placeholder-text : "";
+                color: NexoraTheme.text-faint;
+                font-size: 14px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+
+            input := TextInput {
+                property <length> computed-x;
+                x: min(0px, max(parent.width - self.width - self.text-cursor-width, self.computed-x));
+                width: max(parent.width - self.text-cursor-width, self.preferred-width);
+                height: parent.height;
+                text <=> root.text;
+                enabled: root.enabled;
+                read-only: root.read-only;
+                input-type: root.input-type;
+                single-line: true;
+                color: root.enabled ? NexoraTheme.text : NexoraTheme.text-faint;
+                font-size: 14px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                selection-foreground-color: white;
+                selection-background-color: NexoraTheme.brand;
+                accessible-role: none;
+
+                cursor-position-changed(cursor-position) => {
+                    if cursor-position.x + self.computed-x < 8px {
+                        self.computed-x = -cursor-position.x + 8px;
+                    } else if cursor-position.x + self.computed-x > parent.width - 8px - self.text-cursor-width {
+                        self.computed-x = parent.width - cursor-position.x - 8px - self.text-cursor-width;
+                    }
+                }
+
+                accepted => { root.accepted(self.text); }
+                edited => { root.edited(self.text); }
+            }
+        }
+    }
+}

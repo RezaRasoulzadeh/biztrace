@@ -1,0 +1,12 @@
+// ui/components/rtl_table_header_cell.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlTableHeaderCell inherits RtlText {
+    color: NexoraTheme.text-muted;
+    font-size: 13px;
+    font-weight: 600;
+    wrap: no-wrap;
+    overflow: elide;
+}

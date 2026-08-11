@@ -1,0 +1,12 @@
+[package]
+name = "nexora"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fontique = { version = "0.10.0", features = ["fontconfig-dlopen"] }
+slint = "1.17.1"
+
+[build-dependencies]
+fontique = { version = "0.10.0", features = ["fontconfig-dlopen"] }
+slint-build = "1.17.1"

@@ -1,0 +1,16 @@
+// ui/components/rtl_form_row.slint
+
+import { RtlLabel } from "rtl_label.slint";
+
+export component RtlFormRow inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 12px;
+    min-height: 34px;
+
+    @children
+    RtlLabel {
+        width: 112px;
+        height: 34px;
+        text: root.label;
+    }
+}

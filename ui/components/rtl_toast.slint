@@ -1,0 +1,86 @@
+// ui/components/rtl_toast.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlToast inherits Rectangle {
+    in-out property <bool> open;
+    in property <string> message;
+    property <float> progress;
+    property <bool> progress-running;
+    callback dismissed;
+    height: 54px;
+    opacity: root.open ? 1 : 0;
+    y: root.open ? 20px : -root.height;
+    background: NexoraTheme.brand;
+    border-width: 0px;
+    border-radius: 0px;
+    drop-shadow-color: #80000000;
+    drop-shadow-blur: 18px;
+    drop-shadow-offset-y: 6px;
+    visible: root.opacity > 0;
+    animate opacity { duration: 160ms; }
+    animate y { duration: 180ms; easing: ease-out; }
+    animate progress { duration: root.progress-running ? 4s : 0ms; easing: linear; }
+
+    changed open => {
+        root.progress-running = false;
+        root.progress = 0;
+        if root.open {
+            root.progress-running = true;
+            root.progress = 1;
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 14px;
+        spacing: 10px;
+
+        Rectangle {
+            width: 24px;
+
+            Text {
+                text: "×";
+                color: close-touch.has-hover ? white : #d9ffffff;
+                font-size: 21px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            close-touch := TouchArea {
+                clicked => {
+                    root.open = false;
+                    root.dismissed();
+                }
+            }
+        }
+
+        RtlText {
+            horizontal-stretch: 1;
+            text: root.message;
+            color: white;
+            wrap: no-wrap;
+            overflow: elide;
+        }
+    }
+
+    Rectangle {
+        x: parent.width - self.width;
+        y: parent.height - self.height;
+        width: parent.width * root.progress;
+        height: 3px;
+        background: white;
+        opacity: 0.8;
+        border-radius: 0px;
+    }
+
+    Timer {
+        interval: 4s;
+        running: root.open;
+        triggered => {
+            root.open = false;
+            root.dismissed();
+        }
+    }
+}
