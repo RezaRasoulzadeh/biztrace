@@ -7,32 +7,42 @@ import {
     RtlCard,
     RtlHeading,
     RtlSelectField,
+    RtlSidebar,
     RtlTableHeaderCell,
     RtlText,
     RtlTextField,
+    RtlTopNav,
     RtlToast
 } from "components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component AppWindow inherits Window {
     title: "Nexora — Slint RTL Components Test";
-    width: 920px;
-    height: 740px;
+    preferred-width: 920px;
+    preferred-height: 740px;
+    min-width: 420px;
+    min-height: 480px;
     background: NexoraTheme.canvas;
     default-font-family: NexoraTheme.font-family;
 
     in-out property <string> customer-name;
     in-out property <string> phone-number;
     in-out property <string> status-message: "آماده برای آزمایش ورودی و چیدمان راست‌به‌چپ";
+    in-out property <int> navigation-index;
+    in-out property <bool> navigation-expanded: true;
+    property <bool> compact-navigation: !root.navigation-expanded || root.width < 620px;
+    property <length> workspace-width: root.width - sidebar.width;
     callback submit;
 
     ScrollView {
-        width: parent.width;
-        height: parent.height;
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
 
         VerticalLayout {
-            padding: root.width < 620px ? 14px : 28px;
-            spacing: root.width < 620px ? 14px : 18px;
+            padding: root.workspace-width < 620px ? 14px : 28px;
+            spacing: root.workspace-width < 620px ? 14px : 18px;
 
             RtlHeading { text: "آزمون مؤلفه‌های راست‌به‌چپ Nexora"; }
 
@@ -42,7 +52,7 @@ export component AppWindow inherits Window {
             }
 
             RtlCard {
-                height: root.width < 620px ? 352px : 220px;
+                height: root.workspace-width < 620px ? 352px : 220px;
 
                 VerticalLayout {
                     padding: 18px;
@@ -88,11 +98,11 @@ export component AppWindow inherits Window {
                 height: 30px;
                 padding-left: 12px;
                 padding-right: 12px;
-                spacing: root.width < 500px ? 10px : 18px;
+                spacing: root.workspace-width < 500px ? 10px : 18px;
 
-                RtlTableHeaderCell { width: root.width < 500px ? 54px : 80px; text: "موجودی"; }
-                if root.width >= 500px : RtlTableHeaderCell { width: 150px; text: "قیمت (ریال)"; }
-                if root.width >= 680px : RtlTableHeaderCell { width: 130px; text: "کد کالا"; }
+                RtlTableHeaderCell { width: root.workspace-width < 500px ? 54px : 80px; text: "موجودی"; }
+                if root.workspace-width >= 500px : RtlTableHeaderCell { width: 150px; text: "قیمت (ریال)"; }
+                if root.workspace-width >= 680px : RtlTableHeaderCell { width: 130px; text: "کد کالا"; }
                 RtlTableHeaderCell { horizontal-stretch: 1; text: "نام کالا"; }
             }
 
@@ -101,31 +111,62 @@ export component AppWindow inherits Window {
                 sku: "SKU-1001";
                 price: "1,250,000 ریال";
                 stock: "42";
-                compact: root.width < 680px;
-                narrow: root.width < 500px;
+                compact: root.workspace-width < 680px;
+                narrow: root.workspace-width < 500px;
             }
             ProductRow {
                 product-name: "برنج طارم درجه یک";
                 sku: "SKU-1002";
                 price: "4,800,000 ریال";
                 stock: "15";
-                compact: root.width < 680px;
-                narrow: root.width < 500px;
+                compact: root.workspace-width < 680px;
+                narrow: root.workspace-width < 500px;
             }
             ProductRow {
                 product-name: "روغن آفتابگردان";
                 sku: "SKU-1003";
                 price: "980,000 ریال";
                 stock: "0";
-                compact: root.width < 680px;
-                narrow: root.width < 500px;
+                compact: root.workspace-width < 680px;
+                narrow: root.workspace-width < 500px;
             }
         }
     }
 
+    sidebar := RtlSidebar {
+        x: parent.width - self.width;
+        y: top-nav.height;
+        height: parent.height - top-nav.height;
+        compact: root.compact-navigation;
+        current-index <=> root.navigation-index;
+        toggled => {
+            root.navigation-expanded = !root.navigation-expanded;
+        }
+        items: [
+            { label: "داشبورد", icon: @image-url("../assets/icons/layout-dashboard.svg") },
+            { label: "فروش", icon: @image-url("../assets/icons/shopping-cart.svg") },
+            { label: "کالاها", icon: @image-url("../assets/icons/package.svg") },
+            { label: "مشتریان", icon: @image-url("../assets/icons/users.svg") },
+            { label: "گزارش‌ها", icon: @image-url("../assets/icons/chart-bar.svg") },
+            { label: "تنظیمات", icon: @image-url("../assets/icons/settings.svg") }
+        ];
+    }
+
+    top-nav := RtlTopNav {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        page-title: root.navigation-index == 0 ? "داشبورد مدیریت" :
+            root.navigation-index == 1 ? "مدیریت فروش" :
+            root.navigation-index == 2 ? "مدیریت کالاها" :
+            root.navigation-index == 3 ? "مدیریت مشتریان" :
+            root.navigation-index == 4 ? "گزارش‌ها" : "تنظیمات";
+        user-name: "مدیر سیستم";
+    }
+
     toast := RtlToast {
-        x: max(16px, parent.width - self.width - 24px);
-        width: min(420px, parent.width - 32px);
+        x: max(16px, root.workspace-width - self.width - 24px);
+        width: min(420px, root.workspace-width - 32px);
         message: root.status-message;
     }
 }

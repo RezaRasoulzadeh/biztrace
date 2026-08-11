@@ -1,0 +1,110 @@
+// ui/components/rtl_sidebar.slint
+
+import { NexoraTheme } from "theme.slint";
+import { NexoraIcon } from "nexora_icon.slint";
+import { RtlText } from "rtl_text.slint";
+
+export struct SidebarItemData {
+    label: string,
+    icon: image,
+}
+
+export component RtlSidebar inherits Rectangle {
+    in property <[SidebarItemData]> items;
+    in-out property <int> current-index;
+    in property <bool> compact;
+    callback selected(int);
+    callback toggled;
+    width: root.compact ? 72px : 218px;
+    background: NexoraTheme.surface;
+    animate width { duration: 220ms; easing: ease-in-out; }
+
+    VerticalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-top: 10px;
+        spacing: 7px;
+
+        Rectangle {
+            height: 38px;
+            background: toggle-touch.has-hover ? NexoraTheme.control-hover : transparent;
+            border-radius: 7px;
+            accessible-role: button;
+            accessible-label: root.compact ? "باز کردن نوار کناری" : "بستن نوار کناری";
+
+            NexoraIcon {
+                x: root.compact ? (parent.width - self.width) / 2 : 10px;
+                y: (parent.height - self.height) / 2;
+                width: 22px;
+                height: 22px;
+                source: root.compact ? @image-url("../../assets/icons/panel-left-open.svg") : @image-url("../../assets/icons/panel-right-close.svg");
+                tint: NexoraTheme.text-muted;
+                animate x { duration: 220ms; easing: ease-in-out; }
+            }
+
+            if !root.compact : RtlText {
+                x: 48px;
+                width: parent.width - 58px;
+                height: parent.height;
+                text: "جمع کردن";
+                color: NexoraTheme.text-faint;
+                font-size: 12px;
+                wrap: no-wrap;
+                overflow: elide;
+            }
+
+            toggle-touch := TouchArea { clicked => { root.toggled(); } }
+        }
+
+        for item[index] in root.items : Rectangle {
+            height: 44px;
+            background: index == root.current-index ? NexoraTheme.brand : item-touch.has-hover ? NexoraTheme.control-hover : transparent;
+            border-radius: 7px;
+            accessible-role: button;
+            accessible-label: item.label;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 12px;
+
+                if !root.compact : RtlText {
+                    horizontal-stretch: 1;
+                    text: item.label;
+                    color: index == root.current-index ? white : NexoraTheme.text-muted;
+                    font-weight: index == root.current-index ? 600 : 400;
+                    wrap: no-wrap;
+                    overflow: elide;
+                }
+
+                NexoraIcon {
+                    width: 24px;
+                    height: 24px;
+                    source: item.icon;
+                    tint: index == root.current-index ? white : NexoraTheme.text-muted;
+                }
+            }
+
+            item-touch := TouchArea {
+                clicked => {
+                    root.current-index = index;
+                    root.selected(index);
+                }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            background: transparent;
+        }
+
+        RtlText {
+            height: 34px;
+            text: root.compact ? "v0.1" : "نسخه آزمایشی ۰٫۱";
+            color: NexoraTheme.text-faint;
+            font-size: 11px;
+            horizontal-alignment: center;
+            wrap: no-wrap;
+        }
+    }
+}

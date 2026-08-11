@@ -1,0 +1,76 @@
+// ui/components/rtl_top_nav.slint
+
+import { NexoraTheme } from "theme.slint";
+import { NexoraIcon } from "nexora_icon.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlTopNav inherits Rectangle {
+    in property <string> page-title;
+    in property <string> user-name;
+    callback profile-clicked;
+    height: 62px;
+    background: NexoraTheme.surface;
+
+    Rectangle {
+        y: parent.height - 1px;
+        width: parent.width;
+        height: 1px;
+        background: NexoraTheme.border;
+    }
+
+    profile := Rectangle {
+        x: 18px;
+        y: (parent.height - self.height) / 2;
+        width: 38px;
+        height: 38px;
+        background: profile-touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand;
+        border-radius: 19px;
+
+        NexoraIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 19px;
+            height: 19px;
+            source: @image-url("../../assets/icons/user-round.svg");
+            tint: white;
+        }
+
+        profile-touch := TouchArea { clicked => { root.profile-clicked(); } }
+    }
+
+    if root.width >= 620px : RtlText {
+        x: profile.x + profile.width + 14px;
+        y: 0;
+        width: 132px;
+        height: parent.height;
+        text: root.user-name;
+        horizontal-alignment: left;
+        wrap: no-wrap;
+        overflow: elide;
+    }
+
+    brand := RtlText {
+        x: parent.width - self.width - 20px;
+        y: 0;
+        width: 86px;
+        height: parent.height;
+        text: "NEXORA";
+        color: NexoraTheme.brand-soft;
+        font-size: 16px;
+        font-weight: 700;
+        horizontal-alignment: right;
+        wrap: no-wrap;
+    }
+
+    RtlText {
+        x: root.width >= 620px ? 220px : 72px;
+        y: 0;
+        width: max(0px, brand.x - self.x - 18px);
+        height: parent.height;
+        text: root.page-title;
+        font-size: 17px;
+        font-weight: 600;
+        wrap: no-wrap;
+        overflow: elide;
+    }
+}
