@@ -1,6 +1,7 @@
 // ui/components/rtl_line_edit.slint
 
 import { NexoraTheme } from "theme.slint";
+import { NexoraIcon } from "nexora_icon.slint";
 
 export component RtlLineEdit inherits Rectangle {
     in property <bool> enabled: true;
@@ -40,12 +41,13 @@ export component RtlLineEdit inherits Rectangle {
         if !root.text.is-empty && root.enabled && !root.read-only : Rectangle {
             width: 18px;
 
-            Text {
-                text: "×";
-                color: clear-touch.has-hover ? NexoraTheme.text : NexoraTheme.text-muted;
-                font-size: 20px;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+            NexoraIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: 15px;
+                height: 15px;
+                source: @image-url("../../assets/icons/x.svg");
+                tint: clear-touch.has-hover ? NexoraTheme.text : NexoraTheme.text-muted;
             }
 
             clear-touch := TouchArea {
