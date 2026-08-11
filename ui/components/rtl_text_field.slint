@@ -1,15 +1,19 @@
 // ui/components/rtl_text_field.slint
 
 import { RtlLabel } from "rtl_label.slint";
-import { RtlLineEdit } from "rtl_line_edit.slint";
+import { FormattedInput, RtlLineEdit } from "rtl_line_edit.slint";
 
 export component RtlTextField inherits Rectangle {
     in property <string> label;
     in property <string> placeholder-text;
     in property <bool> enabled: true;
+    in property <bool> numeric-mode: false;
     in-out property <string> text;
     callback accepted(string);
+    callback committed(string);
     callback edited(string);
+    callback edited-with-cursor(string, int);
+    callback format-numeric(string, int) -> FormattedInput;
     min-height: root.width < 520px ? 78px : 34px;
 
     if root.width >= 520px : HorizontalLayout {
@@ -20,8 +24,12 @@ export component RtlTextField inherits Rectangle {
             text <=> root.text;
             placeholder-text: root.placeholder-text;
             enabled: root.enabled;
+            numeric-mode: root.numeric-mode;
             accepted(value) => { root.accepted(value); }
+            committed(value) => { root.committed(value); }
             edited(value) => { root.edited(value); }
+            edited-with-cursor(value, cursor) => { root.edited-with-cursor(value, cursor); }
+            format-numeric(value, cursor) => { return root.format-numeric(value, cursor); }
         }
         RtlLabel { text: root.label; }
     }
@@ -39,8 +47,12 @@ export component RtlTextField inherits Rectangle {
             text <=> root.text;
             placeholder-text: root.placeholder-text;
             enabled: root.enabled;
+            numeric-mode: root.numeric-mode;
             accepted(value) => { root.accepted(value); }
+            committed(value) => { root.committed(value); }
             edited(value) => { root.edited(value); }
+            edited-with-cursor(value, cursor) => { root.edited-with-cursor(value, cursor); }
+            format-numeric(value, cursor) => { return root.format-numeric(value, cursor); }
         }
     }
 }

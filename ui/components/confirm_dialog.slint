@@ -1,0 +1,50 @@
+// ui/components/confirm_dialog.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlButton } from "rtl_button.slint";
+import { RtlCard } from "rtl_card.slint";
+import { RtlHeading } from "rtl_heading.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component ConfirmDialog inherits Rectangle {
+    in-out property <bool> open;
+    in property <string> title;
+    in property <string> message;
+    in property <string> confirm-text;
+    callback confirmed;
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 140ms; }
+
+    FocusScope {
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: true;
+        focus-on-tab-navigation: false;
+    }
+
+    RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 14px;
+        width: min(430px, parent.width - 28px);
+        height: 220px;
+        drop-shadow-color: #99000000;
+        drop-shadow-blur: 24px;
+        animate y { duration: 170ms; easing: ease-out; }
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 10px;
+            RtlHeading { text: root.title; font-size: 19px; }
+            RtlText { text: root.message; color: NexoraTheme.text-muted; }
+            Rectangle { vertical-stretch: 1; background: transparent; }
+            HorizontalLayout {
+                height: 40px;
+                spacing: 10px;
+                RtlButton { horizontal-stretch: 1; text: "انصراف"; primary: false; clicked => { root.open = false; } }
+                RtlButton { horizontal-stretch: 1; text: root.confirm-text; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { root.open = false; root.confirmed(); } }
+            }
+        }
+    }
+}

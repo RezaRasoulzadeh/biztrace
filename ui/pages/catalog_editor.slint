@@ -1,0 +1,112 @@
+// ui/pages/catalog_editor.slint
+
+import { FormattedInput, IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component CatalogEditor inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <string> item-id;
+    in-out property <string> item-name;
+    in-out property <string> sku;
+    in-out property <string> price;
+    in-out property <int> kind-index;
+    in-out property <int> unit-index;
+    in property <string> error-message;
+    callback save(string, string, string, int, int, string);
+    callback format-price(string, int) -> FormattedInput;
+    callback cancelled;
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+
+    FocusScope {
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: true;
+        focus-on-tab-navigation: false;
+    }
+
+    card := RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 18px;
+        width: min(620px, parent.width - 28px);
+        height: min(500px, parent.height - 28px);
+        drop-shadow-color: #99000000;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        animate y { duration: 180ms; easing: ease-out; }
+
+        ScrollView {
+            width: parent.width;
+            height: parent.height;
+
+            VerticalLayout {
+                padding: root.width < 560px ? 16px : 22px;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    height: 38px;
+                    spacing: 10px;
+
+                IconButton {
+                    icon: @image-url("../../assets/icons/x.svg");
+                    label: "بستن";
+                    clicked => { root.open = false; root.cancelled(); }
+                }
+
+                RtlHeading {
+                    horizontal-stretch: 1;
+                    text: root.item-id.is-empty ? "افزودن کالا یا خدمت" : "ویرایش کالا یا خدمت";
+                    font-size: 20px;
+                }
+            }
+
+                RtlSelectField {
+                label: "نوع:";
+                model: ["کالا", "خدمت"];
+                current-index <=> root.kind-index;
+                selected(value) => {
+                    if value == "خدمت" && root.unit-index < 5 {
+                        root.unit-index = 5;
+                    } else if value == "کالا" && root.unit-index >= 5 {
+                        root.unit-index = 0;
+                    }
+                }
+            }
+
+                RtlTextField { label: "نام:"; text <=> root.item-name; placeholder-text: "مثلاً چای یا تعمیر دستگاه"; }
+                RtlTextField { label: "کد کالا:"; text <=> root.sku; placeholder-text: "اختیاری"; }
+                RtlSelectField {
+                label: "واحد:";
+                model: ["عدد", "کیلوگرم", "گرم", "لیتر", "متر", "ساعت", "جلسه", "سفارشی"];
+                current-index <=> root.unit-index;
+            }
+                RtlTextField {
+                label: "قیمت فروش:";
+                text <=> root.price;
+                placeholder-text: "ریال";
+                numeric-mode: true;
+                format-numeric(value, cursor) => { return root.format-price(value, cursor); }
+            }
+
+                if !root.error-message.is-empty : RtlText {
+                height: 28px;
+                text: root.error-message;
+                color: #ff9aaa;
+                font-size: 12px;
+            }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+
+                HorizontalLayout {
+                height: 40px;
+                spacing: 10px;
+
+                RtlButton { width: 120px; text: "انصراف"; icon: @image-url("../../assets/icons/x.svg"); primary: false; clicked => { root.open = false; root.cancelled(); } }
+                RtlButton { horizontal-stretch: 1; text: "ذخیره"; icon: @image-url("../../assets/icons/check.svg"); clicked => { root.save(root.item-id, root.item-name, root.sku, root.kind-index, root.unit-index, root.price); } }
+                }
+            }
+        }
+    }
+}

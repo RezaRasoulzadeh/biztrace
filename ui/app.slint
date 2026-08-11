@@ -1,8 +1,9 @@
 // ui/app.slint
 
-import { NexoraTheme, RtlSidebar, RtlToast, RtlTopNav } from "components/mod.slint";
+import { FormattedInput, NexoraTheme, RtlSidebar, RtlToast, RtlTopNav } from "components/mod.slint";
 import {
     CatalogPage,
+    CatalogItemData,
     CustomersPage,
     DashboardPage,
     FundsPage,
@@ -31,9 +32,29 @@ export component AppWindow inherits Window {
     in property <int> transaction-count;
     in property <int> user-count;
     in-out property <string> status-message;
+    in property <[CatalogItemData]> catalog-items;
+    in-out property <string> catalog-search-text;
+    in-out property <bool> catalog-editor-open;
+    in-out property <string> catalog-editor-error;
+    in-out property <bool> notification-open;
+    callback catalog-search(string);
+    callback catalog-save(string, string, string, int, int, string);
+    callback catalog-format-price(string, int) -> FormattedInput;
+    callback catalog-remove(string);
+    callback catalog-download-template;
+    callback catalog-import-excel;
     property <bool> compact-navigation: !root.navigation-expanded || root.width < 620px;
     property <length> workspace-width: root.width - sidebar.width;
     property <bool> narrow-content: root.workspace-width < 640px;
+
+    FocusScope {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: true;
+        focus-on-tab-navigation: false;
+    }
 
     if root.navigation-index == 0 : DashboardPage {
         x: 0;
@@ -66,11 +87,16 @@ export component AppWindow inherits Window {
         width: root.workspace-width;
         height: parent.height - top-nav.height;
         narrow: root.narrow-content;
-        item-count: root.catalog-count;
-        create => {
-            root.status-message = "فرم ثبت کالا و خدمت در مرحله بعد اضافه می‌شود";
-            toast.open = true;
-        }
+        items: root.catalog-items;
+        search-text <=> root.catalog-search-text;
+        editor-open <=> root.catalog-editor-open;
+        editor-error: root.catalog-editor-error;
+        search(value) => { root.catalog-search(value); }
+        save(id, name, sku, kind, unit, price) => { root.catalog-save(id, name, sku, kind, unit, price); }
+        format-price(value, cursor) => { return root.catalog-format-price(value, cursor); }
+        remove(id) => { root.catalog-remove(id); }
+        download-template => { root.catalog-download-template(); }
+        import-excel => { root.catalog-import-excel(); }
     }
 
     if root.navigation-index == 3 : CustomersPage {
@@ -158,13 +184,6 @@ export component AppWindow inherits Window {
         x: 0;
         y: 0;
         width: parent.width;
-        page-title: root.navigation-index == 0 ? "داشبورد" :
-            root.navigation-index == 1 ? "فاکتورها" :
-            root.navigation-index == 2 ? "کالاها و خدمات" :
-            root.navigation-index == 3 ? "مشتریان" :
-            root.navigation-index == 4 ? "موجودی و انبار" :
-            root.navigation-index == 5 ? "وجوه و حساب‌ها" :
-            root.navigation-index == 6 ? "کاربران و نقش‌ها" : "تنظیمات";
         user-name: "مدیر سیستم";
     }
 
@@ -172,5 +191,6 @@ export component AppWindow inherits Window {
         x: max(16px, root.workspace-width - self.width - 24px);
         width: min(420px, root.workspace-width - 32px);
         message: root.status-message;
+        open <=> root.notification-open;
     }
 }

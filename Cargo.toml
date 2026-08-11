@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+calamine = "0.36.0"
 directories = "6.0.0"
 fontique = { version = "0.10.0", features = ["fontconfig-dlopen"] }
+rfd = "0.17.2"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
+rust_xlsxwriter = "0.96.0"
 slint = "1.17.1"
 
 [build-dependencies]

@@ -3,15 +3,24 @@
 import { NexoraTheme } from "theme.slint";
 import { NexoraIcon } from "nexora_icon.slint";
 
+export struct FormattedInput {
+    text: string,
+    cursor: int,
+}
+
 export component RtlLineEdit inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> read-only: false;
+    in property <bool> numeric-mode: false;
     in property <InputType> input-type: InputType.text;
     in property <string> placeholder-text;
     in-out property <string> text;
     out property <bool> has-focus: input.has-focus;
     callback accepted(string);
+    callback committed(string);
     callback edited(string);
+    callback edited-with-cursor(string, int);
+    callback format-numeric(string, int) -> FormattedInput;
     min-height: 34px;
     min-width: 120px;
     background: root.enabled ? input.has-focus ? NexoraTheme.control-hover : NexoraTheme.control : NexoraTheme.surface-raised;
@@ -24,6 +33,12 @@ export component RtlLineEdit inherits Rectangle {
     accessible-value: root.text;
     accessible-placeholder-text: root.placeholder-text;
     accessible-read-only: root.read-only;
+
+    changed has-focus => {
+        if !root.has-focus {
+            root.committed(root.text);
+        }
+    }
 
     Rectangle {
         x: 0;
@@ -76,8 +91,8 @@ export component RtlLineEdit inherits Rectangle {
 
             input := TextInput {
                 property <length> computed-x;
-                x: min(0px, max(parent.width - self.width - self.text-cursor-width, self.computed-x));
-                width: max(parent.width - self.text-cursor-width, self.preferred-width);
+                x: root.numeric-mode ? 0px : min(0px, max(parent.width - self.width - self.text-cursor-width, self.computed-x));
+                width: root.numeric-mode ? parent.width : max(parent.width - self.text-cursor-width, self.preferred-width);
                 height: parent.height;
                 text <=> root.text;
                 enabled: root.enabled;
@@ -101,7 +116,15 @@ export component RtlLineEdit inherits Rectangle {
                 }
 
                 accepted => { root.accepted(self.text); }
-                edited => { root.edited(self.text); }
+                edited => {
+                    if root.numeric-mode {
+                        let formatted = root.format-numeric(self.text, self.cursor-position-byte-offset);
+                        self.text = formatted.text;
+                        self.set-selection-offsets(formatted.cursor, formatted.cursor);
+                    }
+                    root.edited(self.text);
+                    root.edited-with-cursor(self.text, self.cursor-position-byte-offset);
+                }
             }
         }
     }

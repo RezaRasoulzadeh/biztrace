@@ -20,11 +20,18 @@ export component EmptyState inherits RtlCard {
         spacing: 10px;
         alignment: center;
 
-        NexoraIcon {
-            width: 34px;
-            height: 34px;
-            source: root.icon;
-            tint: NexoraTheme.brand-soft;
+        Rectangle {
+            height: 42px;
+            background: transparent;
+
+            NexoraIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: 34px;
+                height: 34px;
+                source: root.icon;
+                tint: NexoraTheme.brand-soft;
+            }
         }
 
         RtlText {

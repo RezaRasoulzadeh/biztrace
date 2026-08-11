@@ -1,5 +1,9 @@
 // src/database/mod.rs
 
+mod catalog;
+
+pub use catalog::{CatalogDraft, CatalogImportResult, CatalogRecord};
+
 use std::env;
 use std::error::Error;
 use std::fmt;

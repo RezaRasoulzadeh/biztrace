@@ -7,9 +7,12 @@ import { RtlText } from "rtl_text.slint";
 export component RtlButton inherits Rectangle {
     in property <string> text;
     in property <image> icon;
+    in property <bool> primary: true;
     callback clicked;
     min-height: 36px;
-    background: touch.pressed ? NexoraTheme.brand-pressed : touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand;
+    background: root.primary ? touch.pressed ? NexoraTheme.brand-pressed : touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand : touch.has-hover ? NexoraTheme.control-hover : NexoraTheme.control;
+    border-color: root.primary ? transparent : NexoraTheme.border;
+    border-width: root.primary ? 0px : 1px;
     border-radius: 7px;
     accessible-role: button;
     accessible-label: root.text;
@@ -28,11 +31,18 @@ export component RtlButton inherits Rectangle {
             overflow: elide;
         }
 
-        if root.icon.width > 0 : NexoraIcon {
-            width: 17px;
-            height: 17px;
-            source: root.icon;
-            tint: white;
+        if root.icon.width > 0 : Rectangle {
+            width: 19px;
+            background: transparent;
+
+            NexoraIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: 17px;
+                height: 17px;
+                source: root.icon;
+                tint: white;
+            }
         }
     }
 

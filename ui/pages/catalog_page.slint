@@ -1,22 +1,233 @@
 // ui/pages/catalog_page.slint
 
-import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlTableHeaderCell, RtlText, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
+import { CatalogEditor } from "catalog_editor.slint";
+import { CatalogItemData, CatalogItemRow } from "catalog_item_row.slint";
 
 export component CatalogPage inherits Rectangle {
     in property <bool> narrow;
-    in property <int> item-count;
-    callback create;
+    in property <[CatalogItemData]> items;
+    in-out property <bool> editor-open;
+    in property <string> editor-error;
+    in-out property <string> search-text;
+    property <string> pending-remove-id;
+    property <string> pending-remove-name;
+    callback search(string);
+    callback save(string, string, string, int, int, string);
+    callback format-price(string, int) -> FormattedInput;
+    callback remove(string);
+    callback download-template;
+    callback import-excel;
     background: transparent;
+    property <bool> show-tips: root.width >= 1050px;
+    property <length> tips-width: 310px;
+    property <length> content-width: root.width - (root.show-tips ? root.tips-width : 0px);
+    property <bool> compact-content: root.narrow || root.content-width < 640px;
 
     ScrollView {
+        x: root.show-tips ? root.tips-width : 0px;
+        width: root.content-width;
+        height: parent.height;
+
+        VerticalLayout {
+            padding: root.compact-content ? 14px : 28px;
+            spacing: 14px;
+            alignment: start;
+
+            RtlHeading { text: "کالاها و خدمات"; }
+
+            RtlText {
+                text: "مدیریت اقلام قابل فروش و قیمت‌گذاری";
+                color: NexoraTheme.text-muted;
+            }
+
+            HorizontalLayout {
+                height: 40px;
+                spacing: 8px;
+
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+
+                RtlButton {
+                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    text: "فایل نمونه";
+                    icon: @image-url("../../assets/icons/download.svg");
+                    primary: false;
+                    clicked => { root.download-template(); }
+                }
+
+                RtlButton {
+                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    text: "ورود اکسل";
+                    icon: @image-url("../../assets/icons/file-spreadsheet.svg");
+                    primary: false;
+                    clicked => { root.import-excel(); }
+                }
+
+                RtlButton {
+                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    text: "افزودن";
+                    icon: @image-url("../../assets/icons/package-plus.svg");
+                    clicked => {
+                    editor.item-id = "";
+                    editor.item-name = "";
+                    editor.sku = "";
+                    editor.price = "";
+                    editor.kind-index = 0;
+                    editor.unit-index = 0;
+                    root.editor-open = true;
+                }
+                }
+            }
+
+            RtlLineEdit {
+                height: 40px;
+                text <=> root.search-text;
+                placeholder-text: "جستجو با نام یا کد کالا";
+                edited(value) => { root.search(value); }
+            }
+
+            RtlText {
+                height: 28px;
+                text: root.items.length + " مورد";
+                color: NexoraTheme.text-muted;
+                font-size: 12px;
+            }
+
+            if root.items.length == 0 : EmptyState {
+                icon: @image-url("../../assets/icons/package-plus.svg");
+                title: root.search-text.is-empty ? "فهرست فروش خالی است" : "نتیجه‌ای پیدا نشد";
+                description: root.search-text.is-empty ? "یک کالا یا خدمت به فهرست کسب‌وکار اضافه کنید." : "عبارت دیگری را جستجو کنید یا یک مورد جدید بسازید.";
+                action-text: "افزودن مورد";
+                action-icon: @image-url("../../assets/icons/package-plus.svg");
+                action => {
+                    editor.item-id = "";
+                    editor.item-name = "";
+                    editor.sku = "";
+                    editor.price = "";
+                    editor.kind-index = 0;
+                    editor.unit-index = 0;
+                    root.editor-open = true;
+                }
+            }
+
+            if root.items.length > 0 : HorizontalLayout {
+                height: 30px;
+                padding-left: 10px;
+                padding-right: 14px;
+                spacing: 10px;
+
+                RtlTableHeaderCell { width: 78px; text: "عملیات"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 130px; text: "قیمت فروش"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 90px; text: "واحد"; }
+                RtlTableHeaderCell { horizontal-stretch: 1; text: "نام و کد"; }
+            }
+
+            for item in root.items : CatalogItemRow {
+                item: item;
+                narrow: root.compact-content;
+                edit => {
+                    editor.item-id = item.id;
+                    editor.item-name = item.name;
+                    editor.sku = item.sku;
+                    editor.price = item.price-value;
+                    editor.kind-index = item.kind-code == "product" ? 0 : 1;
+                    editor.unit-index = item.unit-code == "each" ? 0 :
+                        item.unit-code == "kilogram" ? 1 :
+                        item.unit-code == "gram" ? 2 :
+                        item.unit-code == "liter" ? 3 :
+                        item.unit-code == "meter" ? 4 :
+                        item.unit-code == "hour" ? 5 :
+                        item.unit-code == "session" ? 6 : 7;
+                    root.editor-open = true;
+                }
+                remove => {
+                    root.pending-remove-id = item.id;
+                    root.pending-remove-name = item.name;
+                    confirm.open = true;
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        x: root.show-tips ? 0px : -root.tips-width;
+        y: 0;
+        width: root.tips-width;
+        height: parent.height;
+        background: NexoraTheme.surface;
+        opacity: root.show-tips ? 1 : 0;
+        visible: root.opacity > 0;
+        animate opacity { duration: 180ms; }
+        animate x { duration: 220ms; easing: ease-out; }
+
+        Rectangle {
+            x: parent.width - self.width;
+            y: 0;
+            width: 3px;
+            height: parent.height;
+            background: NexoraTheme.brand;
+        }
+
+        VerticalLayout {
+            padding-left: 22px;
+            padding-right: 22px;
+            padding-top: 28px;
+            padding-bottom: 24px;
+            spacing: 6px;
+
+            HorizontalLayout {
+                height: 46px;
+                spacing: 10px;
+
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                RtlHeading { text: "ورود گروهی با اکسل"; font-size: 18px; }
+                Rectangle {
+                    width: 42px;
+                    height: 42px;
+                    background: NexoraTheme.brand;
+                    border-radius: 21px;
+
+                    NexoraIcon {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        width: 21px;
+                        height: 21px;
+                        source: @image-url("../../assets/icons/file-spreadsheet.svg");
+                        tint: white;
+                    }
+                }
+            }
+
+            RtlText {
+                height: 38px;
+                text: "صدها کالا و خدمت را در چند مرحله ساده ثبت کنید.";
+                color: NexoraTheme.text-muted;
+                font-size: 12px;
+            }
+            TipRow { icon: @image-url("../../assets/icons/download.svg"); text: "فایل نمونه Nexora را دریافت کنید."; }
+            TipRow { icon: @image-url("../../assets/icons/sheet.svg"); text: "ردیف‌ها را تکمیل کنید؛ عنوان ستون‌ها ثابت بماند."; }
+            TipRow { icon: @image-url("../../assets/icons/badge-check.svg"); text: "کد کالا کمک می‌کند موارد تکراری تشخیص داده شوند."; }
+            TipRow { icon: @image-url("../../assets/icons/upload.svg"); text: "فایل را وارد کنید؛ تکراری‌ها رد و بقیه ذخیره می‌شوند."; }
+            Rectangle { vertical-stretch: 1; background: transparent; }
+        }
+    }
+
+    editor := CatalogEditor {
         width: parent.width;
         height: parent.height;
-        VerticalLayout {
-            padding: root.narrow ? 14px : 28px;
-            spacing: 18px;
-            PageHeader { title: "کالاها و خدمات"; description: "مدیریت اقلام قابل فروش و قیمت‌گذاری"; action-text: "مورد جدید"; action-icon: @image-url("../../assets/icons/package-plus.svg"); narrow: root.narrow; action => { root.create(); } }
-            EmptyState { icon: @image-url("../../assets/icons/package-plus.svg"); title: "فهرست فروش خالی است"; description: "یک کالا یا خدمت به فهرست کسب‌وکار اضافه کنید."; action-text: "افزودن مورد"; action-icon: @image-url("../../assets/icons/package-plus.svg"); action => { root.create(); } }
-        }
+        open <=> root.editor-open;
+        error-message: root.editor-error;
+        save(id, name, sku, kind, unit, price) => { root.save(id, name, sku, kind, unit, price); }
+        format-price(value, cursor) => { return root.format-price(value, cursor); }
+    }
+
+    confirm := ConfirmDialog {
+        width: parent.width;
+        height: parent.height;
+        title: "حذف مورد";
+        message: "«" + root.pending-remove-name + "» برای همیشه حذف شود؟";
+        confirm-text: "حذف";
+        confirmed => { root.remove(root.pending-remove-id); }
     }
 }

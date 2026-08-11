@@ -5,7 +5,6 @@ import { NexoraIcon } from "nexora_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export component RtlTopNav inherits Rectangle {
-    in property <string> page-title;
     in property <string> user-name;
     callback profile-clicked;
     height: 62px;
@@ -52,25 +51,13 @@ export component RtlTopNav inherits Rectangle {
     brand := RtlText {
         x: parent.width - self.width - 20px;
         y: 0;
-        width: 86px;
+        width: 146px;
         height: parent.height;
         text: "NEXORA";
-        color: NexoraTheme.brand-soft;
-        font-size: 16px;
+        color: NexoraTheme.brand;
+        font-size: 25px;
         font-weight: 700;
         horizontal-alignment: right;
         wrap: no-wrap;
-    }
-
-    RtlText {
-        x: root.width >= 620px ? 220px : 72px;
-        y: 0;
-        width: max(0px, brand.x - self.x - 18px);
-        height: parent.height;
-        text: root.page-title;
-        font-size: 17px;
-        font-weight: 600;
-        wrap: no-wrap;
-        overflow: elide;
     }
 }

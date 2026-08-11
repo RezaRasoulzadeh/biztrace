@@ -1,0 +1,39 @@
+// ui/components/tip_row.slint
+
+import { NexoraIcon } from "nexora_icon.slint";
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component TipRow inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    height: 52px;
+    background: transparent;
+
+    Rectangle {
+        x: parent.width - self.width;
+        y: 8px;
+        width: 34px;
+        height: 34px;
+        background: #2489023e;
+        border-radius: 17px;
+
+        NexoraIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 17px;
+            height: 17px;
+            source: root.icon;
+            tint: NexoraTheme.brand-soft;
+        }
+    }
+
+    RtlText {
+        x: 0;
+        width: parent.width - 46px;
+        height: parent.height;
+        text: root.text;
+        color: NexoraTheme.text-muted;
+        font-size: 12px;
+    }
+}
