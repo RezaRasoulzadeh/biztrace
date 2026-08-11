@@ -2,8 +2,13 @@
 
 use std::rc::Rc;
 
-use nexora::database::{CatalogDraft, CatalogRecord, Database};
-use nexora::import::{read_catalog_excel, write_catalog_template};
+use nexora::database::{
+    CatalogDraft, CatalogRecord, Database, DatabaseError, InventoryMovementDraft, MovementRecord,
+    StockRecord, WarehouseRecord,
+};
+use nexora::import::{
+    read_catalog_excel, read_inventory_excel, write_catalog_template, write_inventory_template,
+};
 use rfd::FileDialog;
 use slint::{ModelRc, SharedString, VecModel};
 
@@ -21,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.set_transaction_count(counts.fund_transactions);
     app.set_user_count(counts.users);
     app.set_catalog_items(catalog_model(database.catalog_items("")?));
+    refresh_inventory(&app, &database, "")?;
 
     app.on_catalog_format_price(format_price_input);
 
@@ -154,6 +160,312 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             Err(error) => app.set_status_message(format!("ورود اکسل انجام نشد: {error}").into()),
+        }
+        app.set_notification_open(true);
+    });
+
+    let weak = app.as_weak();
+    let inventory_search_database = Rc::clone(&database);
+    app.on_inventory_search(move |search| {
+        if let (Some(app), Ok(records)) = (
+            weak.upgrade(),
+            inventory_search_database.stock_records(&search),
+        ) && let Ok(warehouses) = inventory_search_database.warehouses()
+        {
+            app.set_inventory_items(stock_model(records, &warehouses));
+        }
+    });
+
+    let weak = app.as_weak();
+    let warehouse_database = Rc::clone(&database);
+    app.on_save_warehouse(move |id, name, address| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_inventory_editor_error("".into());
+        if name.trim().is_empty() {
+            app.set_inventory_editor_error("نام انبار را وارد کنید".into());
+            return;
+        }
+        let address = (!address.trim().is_empty()).then(|| address.trim().to_owned());
+        let id = if id.is_empty() { None } else { id.parse().ok() };
+        match warehouse_database.save_warehouse(id, name.trim(), address.as_deref()) {
+            Ok(_) => {
+                if refresh_inventory(&app, &warehouse_database, "").is_ok() {
+                    app.set_warehouse_editor_open(false);
+                    app.set_status_message("انبار ذخیره شد".into());
+                    app.set_notification_open(true);
+                }
+            }
+            Err(_) => app.set_inventory_editor_error("نام انبار نباید تکراری باشد".into()),
+        }
+    });
+
+    let weak = app.as_weak();
+    let remove_warehouse_database = Rc::clone(&database);
+    app.on_remove_warehouse(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_inventory_editor_error("".into());
+        let Some(id) = id.parse().ok() else { return };
+        match remove_warehouse_database.remove_warehouse(id) {
+            Ok(()) => {
+                if refresh_inventory(&app, &remove_warehouse_database, "").is_ok() {
+                    app.set_warehouse_removal_open(false);
+                    app.set_status_message("انبار حذف شد و سوابق آن حفظ شدند".into());
+                    app.set_notification_open(true);
+                }
+            }
+            Err(DatabaseError::Validation(_)) => app.set_inventory_editor_error(
+                "این انبار موجودی دارد؛ آن را دستی مدیریت کنید یا انتقال اجباری را انتخاب کنید"
+                    .into(),
+            ),
+            Err(_) => app.set_inventory_editor_error("حذف انبار انجام نشد".into()),
+        }
+    });
+
+    let weak = app.as_weak();
+    let warehouse_choices_database = Rc::clone(&database);
+    app.on_prepare_warehouse_removal(move |source_id| {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(source_id) = source_id.parse::<i64>().ok() else {
+            return;
+        };
+        if let Ok(warehouses) = warehouse_choices_database.warehouses() {
+            let alternatives: Vec<_> = warehouses
+                .into_iter()
+                .filter(|warehouse| warehouse.id != source_id)
+                .collect();
+            app.set_inventory_warehouse_alternative_names(string_model(
+                alternatives.iter().map(|item| item.name.clone()).collect(),
+            ));
+            app.set_inventory_warehouse_alternative_ids(string_model(
+                alternatives
+                    .into_iter()
+                    .map(|item| item.id.to_string())
+                    .collect(),
+            ));
+            app.set_inventory_editor_error("".into());
+        }
+    });
+
+    let weak = app.as_weak();
+    let force_remove_database = Rc::clone(&database);
+    app.on_force_remove_warehouse(move |source_id, target_id| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_inventory_editor_error("".into());
+        let Some(source_id) = source_id.parse().ok() else {
+            return;
+        };
+        let Some(target_id) = target_id.parse().ok() else {
+            app.set_inventory_editor_error("انبار جایگزین را انتخاب کنید".into());
+            return;
+        };
+        let target_name = force_remove_database
+            .warehouses()
+            .ok()
+            .and_then(|warehouses| {
+                warehouses
+                    .into_iter()
+                    .find(|warehouse| warehouse.id == target_id)
+            })
+            .map(|warehouse| warehouse.name)
+            .unwrap_or_else(|| "انبار جایگزین".into());
+        match force_remove_database.move_and_remove_warehouse(source_id, target_id) {
+            Ok(()) => {
+                if refresh_inventory(&app, &force_remove_database, "").is_ok() {
+                    app.set_warehouse_removal_open(false);
+                    app.set_status_message(
+                        format!("همه موجودی‌ها به «{target_name}» منتقل و انبار حذف شد").into(),
+                    );
+                    app.set_notification_open(true);
+                }
+            }
+            Err(_) => app.set_inventory_editor_error("انتقال موجودی و حذف انبار انجام نشد".into()),
+        }
+    });
+
+    let weak = app.as_weak();
+    let product_search_database = Rc::clone(&database);
+    app.on_inventory_product_search(move |search| {
+        if let (Some(app), Ok(records)) = (
+            weak.upgrade(),
+            product_search_database.inventory_products(&search),
+        ) {
+            app.set_inventory_product_options(product_option_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let movement_database = Rc::clone(&database);
+    app.on_record_inventory_movement(
+        move |warehouse_index, product_id, direction_index, quantity, unit_cost, reference| {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_inventory_editor_error("".into());
+            let Ok(warehouses) = movement_database.warehouses() else {
+                return;
+            };
+            let Some(warehouse) = warehouses.get(warehouse_index as usize) else {
+                app.set_inventory_editor_error("ابتدا یک انبار ایجاد کنید".into());
+                return;
+            };
+            let Some(product_id) = product_id.parse().ok() else {
+                app.set_inventory_editor_error("ابتدا یک کالا در بخش کالاها ثبت کنید".into());
+                return;
+            };
+            let Some(quantity) = parse_quantity(&quantity) else {
+                app.set_inventory_editor_error("مقدار واردشده معتبر نیست".into());
+                return;
+            };
+            let unit_cost_minor = if direction_index == 0 {
+                let Some(value) = parse_amount(&unit_cost) else {
+                    app.set_inventory_editor_error("قیمت خرید هر واحد را وارد کنید".into());
+                    return;
+                };
+                Some(value)
+            } else {
+                None
+            };
+            let draft = InventoryMovementDraft {
+                warehouse_id: warehouse.id,
+                item_id: product_id,
+                quantity_milliunits: quantity,
+                increases_stock: direction_index == 0,
+                unit_cost_minor,
+                reference: (!reference.trim().is_empty()).then(|| reference.trim().to_owned()),
+            };
+            match movement_database.record_inventory_movement(&draft) {
+                Ok(()) => {
+                    let search = app.get_inventory_search_text();
+                    if refresh_inventory(&app, &movement_database, &search).is_ok() {
+                        app.set_movement_editor_open(false);
+                        app.set_status_message("تغییر موجودی ثبت شد".into());
+                        app.set_notification_open(true);
+                    }
+                }
+                Err(DatabaseError::Validation(_)) => {
+                    app.set_inventory_editor_error("موجودی برای این خروج کافی نیست".into());
+                }
+                Err(_) => app.set_inventory_editor_error("ثبت موجودی انجام نشد".into()),
+            }
+        },
+    );
+
+    let weak = app.as_weak();
+    let stock_database = Rc::clone(&database);
+    app.on_set_stock_level(
+        move |layer_id, warehouse_index, quantity, unit_cost, reference| {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_inventory_editor_error("".into());
+            let (Some(layer_id), Some(quantity)) =
+                (layer_id.parse().ok(), parse_nonnegative_quantity(&quantity))
+            else {
+                app.set_inventory_editor_error("موجودی نهایی را به‌صورت عدد معتبر وارد کنید".into());
+                return;
+            };
+            let reference = (!reference.trim().is_empty()).then(|| reference.trim().to_owned());
+            let Some(unit_cost_minor) = parse_amount(&unit_cost) else {
+                app.set_inventory_editor_error("بهای خرید هر واحد را وارد کنید".into());
+                return;
+            };
+            let Ok(warehouses) = stock_database.warehouses() else {
+                app.set_inventory_editor_error("خواندن فهرست انبارها انجام نشد".into());
+                return;
+            };
+            let Some(warehouse) = warehouses.get(warehouse_index as usize) else {
+                app.set_inventory_editor_error("انبار مقصد را انتخاب کنید".into());
+                return;
+            };
+            match stock_database.update_cost_layer(
+                layer_id,
+                warehouse.id,
+                quantity,
+                unit_cost_minor,
+                reference.as_deref(),
+            ) {
+                Ok(()) => {
+                    let search = app.get_inventory_search_text();
+                    if refresh_inventory(&app, &stock_database, &search).is_ok() {
+                        app.set_stock_editor_open(false);
+                        app.set_status_message("موجودی نهایی اصلاح شد".into());
+                        app.set_notification_open(true);
+                    }
+                }
+                Err(_) => app.set_inventory_editor_error("اصلاح موجودی انجام نشد".into()),
+            }
+        },
+    );
+
+    let weak = app.as_weak();
+    let remove_stock_database = Rc::clone(&database);
+    app.on_remove_stock_layer(move |layer_id| {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(layer_id) = layer_id.parse().ok() else {
+            return;
+        };
+        match remove_stock_database.remove_cost_layer(layer_id) {
+            Ok(()) => {
+                let search = app.get_inventory_search_text();
+                if refresh_inventory(&app, &remove_stock_database, &search).is_ok() {
+                    app.set_status_message("ردیف موجودی حذف شد".into());
+                    app.set_notification_open(true);
+                }
+            }
+            Err(_) => {
+                app.set_status_message("حذف ردیف موجودی انجام نشد".into());
+                app.set_notification_open(true);
+            }
+        }
+    });
+
+    let weak = app.as_weak();
+    app.on_inventory_download_template(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(mut path) = FileDialog::new()
+            .set_title("ذخیره فایل نمونه موجودی")
+            .set_file_name("nexora-inventory-template.xlsx")
+            .add_filter("Excel", &["xlsx"])
+            .save_file()
+        else {
+            return;
+        };
+        if path.extension().is_none() {
+            path.set_extension("xlsx");
+        }
+        match write_inventory_template(&path) {
+            Ok(()) => app.set_status_message("فایل نمونه موجودی ذخیره شد".into()),
+            Err(error) => app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into()),
+        }
+        app.set_notification_open(true);
+    });
+
+    let weak = app.as_weak();
+    let inventory_import_database = Rc::clone(&database);
+    app.on_inventory_import_excel(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(path) = FileDialog::new()
+            .set_title("انتخاب فایل ورود موجودی")
+            .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
+            .pick_file()
+        else {
+            return;
+        };
+        match read_inventory_excel(&path) {
+            Ok(file) => match inventory_import_database.import_inventory_rows(&file.rows) {
+                Ok(result) => {
+                    let search = app.get_inventory_search_text();
+                    let _ = refresh_inventory(&app, &inventory_import_database, &search);
+                    app.set_status_message(
+                        format!(
+                            "{} ردیف وارد شد؛ {} ردیف نادیده گرفته شد",
+                            result.inserted,
+                            result.skipped + file.errors.len()
+                        )
+                        .into(),
+                    );
+                }
+                Err(error) => {
+                    app.set_status_message(format!("ورود موجودی انجام نشد: {error}").into())
+                }
+            },
+            Err(error) => app.set_status_message(format!("خواندن فایل انجام نشد: {error}").into()),
         }
         app.set_notification_open(true);
     });
@@ -295,6 +607,161 @@ fn unit_label(code: &str) -> &'static str {
     }
 }
 
+fn refresh_inventory(
+    app: &AppWindow,
+    database: &Database,
+    search: &str,
+) -> Result<(), DatabaseError> {
+    let warehouses = database.warehouses()?;
+    let records = database.stock_records(search)?;
+    app.set_inventory_items(stock_model(records, &warehouses));
+    app.set_warehouse_count(warehouses.len() as i32);
+    app.set_inventory_warehouse_items(warehouse_model(warehouses.clone()));
+    app.set_inventory_warehouses(string_model(
+        warehouses.iter().map(|item| item.name.clone()).collect(),
+    ));
+    app.set_inventory_product_options(product_option_model(database.inventory_products("")?));
+    app.set_inventory_movements(movement_model(database.movement_records()?));
+    Ok(())
+}
+
+fn stock_model(
+    records: Vec<StockRecord>,
+    warehouses: &[WarehouseRecord],
+) -> ModelRc<StockItemData> {
+    let rows: Vec<StockItemData> = records
+        .into_iter()
+        .map(|record| StockItemData {
+            cost_layer_id: record.cost_layer_id.to_string().into(),
+            warehouse_id: record.warehouse_id.to_string().into(),
+            item_id: record.item_id.to_string().into(),
+            item_name: record.item_name.into(),
+            sku: record.sku.into(),
+            warehouse_name: record.warehouse_name.into(),
+            warehouse_index: warehouses
+                .iter()
+                .position(|warehouse| warehouse.id == record.warehouse_id)
+                .unwrap_or_default() as i32,
+            unit_label: unit_label(&record.unit).into(),
+            quantity_label: format_quantity(record.quantity_milliunits).into(),
+            quantity_value: format_quantity(record.quantity_milliunits).into(),
+            inventory_value_label: format_amount(record.inventory_value_minor),
+            unit_cost_label: format_amount(record.unit_cost_minor),
+            unit_cost_value: format_number(record.unit_cost_minor).into(),
+        })
+        .collect();
+    ModelRc::new(VecModel::from(rows))
+}
+
+fn movement_model(records: Vec<MovementRecord>) -> ModelRc<MovementItemData> {
+    ModelRc::new(VecModel::from(
+        records
+            .into_iter()
+            .map(|record| MovementItemData {
+                item_name: record.item_name.into(),
+                warehouse_name: record.warehouse_name.into(),
+                quantity_label: format_quantity(record.quantity_milliunits).into(),
+                increases_stock: record.increases_stock,
+                reference: record.reference.into(),
+                occurred_on: record.occurred_on.into(),
+                unit_cost_label: record
+                    .unit_cost_minor
+                    .map(format_amount)
+                    .unwrap_or_else(|| "—".into()),
+                total_cost_label: record
+                    .total_cost_minor
+                    .map(format_amount)
+                    .unwrap_or_else(|| "—".into()),
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn warehouse_model(records: Vec<WarehouseRecord>) -> ModelRc<WarehouseItemData> {
+    ModelRc::new(VecModel::from(
+        records
+            .into_iter()
+            .map(|record| WarehouseItemData {
+                id: record.id.to_string().into(),
+                name: record.name.into(),
+                address: record.address.into(),
+                has_stock: record.has_stock,
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn product_option_model(records: Vec<(i64, String, String)>) -> ModelRc<SearchOption> {
+    ModelRc::new(VecModel::from(
+        records
+            .into_iter()
+            .map(|(id, name, sku)| SearchOption {
+                id: id.to_string().into(),
+                label: name.into(),
+                detail: if sku.is_empty() {
+                    "بدون کد"
+                } else {
+                    &sku
+                }
+                .into(),
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn string_model(values: Vec<String>) -> ModelRc<SharedString> {
+    ModelRc::new(VecModel::from(
+        values
+            .into_iter()
+            .map(SharedString::from)
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn parse_quantity(value: &str) -> Option<i64> {
+    parse_quantity_value(value).filter(|value| *value > 0)
+}
+
+fn parse_nonnegative_quantity(value: &str) -> Option<i64> {
+    parse_quantity_value(value)
+}
+
+fn parse_quantity_value(value: &str) -> Option<i64> {
+    let normalized: String = value
+        .chars()
+        .filter_map(|character| match character {
+            '0'..='9' | '.' => Some(character),
+            '۰'..='۹' => char::from_digit(character as u32 - '۰' as u32, 10),
+            '٠'..='٩' => char::from_digit(character as u32 - '٠' as u32, 10),
+            '٫' => Some('.'),
+            ',' | '٬' | ' ' => None,
+            _ => Some('\0'),
+        })
+        .collect();
+    if normalized.is_empty() || normalized.contains('\0') {
+        return None;
+    }
+    let (whole, fraction) = normalized.split_once('.').unwrap_or((&normalized, ""));
+    if fraction.len() > 3 || fraction.contains('.') {
+        return None;
+    }
+    let whole = whole.parse::<i64>().ok()?;
+    let fraction = format!("{fraction:0<3}").parse::<i64>().ok()?;
+    whole.checked_mul(1_000)?.checked_add(fraction)
+}
+
+fn format_quantity(value: i64) -> String {
+    let whole = value / 1_000;
+    let fraction = value % 1_000;
+    if fraction == 0 {
+        whole.to_string()
+    } else {
+        format!("{whole}.{fraction:03}")
+            .trim_end_matches('0')
+            .to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,5 +778,11 @@ mod tests {
         let result = format_price_input("12000".into(), 2);
         assert_eq!(result.text, "12,000");
         assert_eq!(result.cursor, 2);
+    }
+
+    #[test]
+    fn quantity_parser_supports_fractional_persian_input() {
+        assert_eq!(parse_quantity("۱۲٫۵"), Some(12_500));
+        assert_eq!(format_quantity(12_500), "12.5");
     }
 }

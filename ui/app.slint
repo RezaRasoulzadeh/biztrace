@@ -1,6 +1,6 @@
 // ui/app.slint
 
-import { FormattedInput, NexoraTheme, RtlSidebar, RtlToast, RtlTopNav } from "components/mod.slint";
+import { FormattedInput, NexoraTheme, RtlSidebar, RtlToast, RtlTopNav, SearchOption } from "components/mod.slint";
 import {
     CatalogPage,
     CatalogItemData,
@@ -9,7 +9,10 @@ import {
     FundsPage,
     InventoryPage,
     InvoicesPage,
+    MovementItemData,
     SettingsPage,
+    StockItemData,
+    WarehouseItemData,
     UsersPage
 } from "pages/mod.slint";
 
@@ -43,6 +46,30 @@ export component AppWindow inherits Window {
     callback catalog-remove(string);
     callback catalog-download-template;
     callback catalog-import-excel;
+    in property <[StockItemData]> inventory-items;
+    in property <[MovementItemData]> inventory-movements;
+    in property <[WarehouseItemData]> inventory-warehouse-items;
+    in property <[string]> inventory-warehouses;
+    in property <[string]> inventory-warehouse-alternative-names;
+    in property <[string]> inventory-warehouse-alternative-ids;
+    in property <[SearchOption]> inventory-product-options;
+    in-out property <string> inventory-search-text;
+    in-out property <bool> warehouse-editor-open;
+    in-out property <bool> movement-editor-open;
+    in-out property <bool> stock-editor-open;
+    in-out property <bool> warehouse-removal-open;
+    in-out property <string> inventory-editor-error;
+    callback inventory-search(string);
+    callback inventory-product-search(string);
+    callback save-warehouse(string, string, string);
+    callback record-inventory-movement(int, string, int, string, string, string);
+    callback set-stock-level(string, int, string, string, string);
+    callback remove-stock-layer(string);
+    callback inventory-download-template;
+    callback inventory-import-excel;
+    callback remove-warehouse(string);
+    callback prepare-warehouse-removal(string);
+    callback force-remove-warehouse(string, string);
     property <bool> compact-navigation: !root.navigation-expanded || root.width < 620px;
     property <length> workspace-width: root.width - sidebar.width;
     property <bool> narrow-content: root.workspace-width < 640px;
@@ -118,11 +145,33 @@ export component AppWindow inherits Window {
         width: root.workspace-width;
         height: parent.height - top-nav.height;
         narrow: root.narrow-content;
-        warehouse-count: root.warehouse-count;
-        create => {
-            root.status-message = "فرم ایجاد انبار در مرحله بعد اضافه می‌شود";
-            toast.open = true;
+        items: root.inventory-items;
+        movements: root.inventory-movements;
+        warehouse-items: root.inventory-warehouse-items;
+        warehouses: root.inventory-warehouses;
+        warehouse-alternative-names: root.inventory-warehouse-alternative-names;
+        warehouse-alternative-ids: root.inventory-warehouse-alternative-ids;
+        product-options: root.inventory-product-options;
+        search-text <=> root.inventory-search-text;
+        warehouse-editor-open <=> root.warehouse-editor-open;
+        movement-editor-open <=> root.movement-editor-open;
+        stock-editor-open <=> root.stock-editor-open;
+        warehouse-removal-open <=> root.warehouse-removal-open;
+        editor-error: root.inventory-editor-error;
+        format-price(value, cursor) => { return root.catalog-format-price(value, cursor); }
+        search(value) => { root.inventory-search(value); }
+        search-product(value) => { root.inventory-product-search(value); }
+        save-warehouse(id, name, address) => { root.save-warehouse(id, name, address); }
+        record-movement(warehouse, product, direction, quantity, cost, reference) => {
+            root.record-inventory-movement(warehouse, product, direction, quantity, cost, reference);
         }
+        set-stock(layer, warehouse, quantity, cost, reference) => { root.set-stock-level(layer, warehouse, quantity, cost, reference); }
+        remove-stock(layer) => { root.remove-stock-layer(layer); }
+        download-template => { root.inventory-download-template(); }
+        import-excel => { root.inventory-import-excel(); }
+        remove-warehouse(id) => { root.remove-warehouse(id); }
+        prepare-warehouse-removal(id) => { root.prepare-warehouse-removal(id); }
+        force-remove-warehouse(id, alternate) => { root.force-remove-warehouse(id, alternate); }
     }
 
     if root.navigation-index == 5 : FundsPage {

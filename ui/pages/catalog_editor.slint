@@ -76,7 +76,7 @@ export component CatalogEditor inherits Rectangle {
             }
 
                 RtlTextField { label: "نام:"; text <=> root.item-name; placeholder-text: "مثلاً چای یا تعمیر دستگاه"; }
-                RtlTextField { label: "کد کالا:"; text <=> root.sku; placeholder-text: "اختیاری"; }
+                RtlTextField { label: "کد کالا:"; text <=> root.sku; placeholder-text: root.kind-index == 0 ? "اختیاری؛ در صورت خالی بودن ساخته می‌شود" : "اختیاری"; }
                 RtlSelectField {
                 label: "واحد:";
                 model: ["عدد", "کیلوگرم", "گرم", "لیتر", "متر", "ساعت", "جلسه", "سفارشی"];

@@ -1,0 +1,49 @@
+// ui/components/search_picker.slint
+
+import { IconButton } from "icon_button.slint";
+import { NexoraTheme } from "theme.slint";
+import { RtlLineEdit } from "rtl_line_edit.slint";
+import { RtlText } from "rtl_text.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export struct SearchOption {
+    id: string,
+    label: string,
+    detail: string,
+}
+
+export component SearchPicker inherits Rectangle {
+    in property <[SearchOption]> options;
+    in-out property <string> query;
+    in-out property <string> selected-id;
+    in-out property <string> selected-label;
+    in property <string> placeholder-text;
+    callback search(string);
+    height: root.selected-id.is-empty ? 210px : 46px;
+
+    if !root.selected-id.is-empty : Rectangle {
+        background: NexoraTheme.control;
+        border-radius: 7px;
+        IconButton { x: 6px; y: 6px; icon: @image-url("../../assets/icons/x.svg"); label: "تغییر کالا"; clicked => { root.selected-id = ""; root.selected-label = ""; root.query = ""; root.search(""); } }
+        RtlText { x: 50px; width: parent.width - 62px; height: parent.height; text: root.selected-label; font-weight: 600; wrap: no-wrap; overflow: elide; }
+    }
+
+    if root.selected-id.is-empty : VerticalLayout {
+        spacing: 6px;
+        RtlLineEdit { height: 40px; text <=> root.query; placeholder-text: root.placeholder-text; edited(value) => { root.search(value); } }
+        ScrollView {
+            height: 164px;
+            VerticalLayout {
+                spacing: 3px;
+                for option in root.options : Rectangle {
+                    height: 40px;
+                    background: option-touch.has-hover ? NexoraTheme.control-hover : NexoraTheme.control;
+                    border-radius: 5px;
+                    RtlText { x: 10px; y: 2px; width: parent.width - 20px; height: 22px; text: option.label; wrap: no-wrap; overflow: elide; }
+                    RtlText { x: 10px; y: 21px; width: parent.width - 20px; height: 16px; text: option.detail; color: NexoraTheme.text-faint; font-size: 11px; wrap: no-wrap; overflow: elide; }
+                    option-touch := TouchArea { clicked => { root.selected-id = option.id; root.selected-label = option.label; } }
+                }
+            }
+        }
+    }
+}

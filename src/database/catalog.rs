@@ -56,6 +56,7 @@ impl Database {
 
     pub fn save_catalog_item(&self, draft: &CatalogDraft) -> Result<i64, DatabaseError> {
         if let Some(id) = draft.id {
+            let sku = resolved_sku(&self.connection, &draft.kind, draft.sku.as_deref(), id)?;
             self.connection.execute(
                 "UPDATE catalog_items
                  SET kind = ?1, name = ?2, sku = ?3, unit = ?4, sale_price_minor = ?5,
@@ -65,7 +66,7 @@ impl Database {
                 params![
                     draft.kind,
                     draft.name,
-                    draft.sku,
+                    sku,
                     draft.unit,
                     draft.sale_price_minor,
                     id
@@ -73,6 +74,12 @@ impl Database {
             )?;
             return Ok(id);
         }
+        let next_id = self.connection.query_row(
+            "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'catalog_items'), 0) + 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        let sku = resolved_sku(&self.connection, &draft.kind, draft.sku.as_deref(), next_id)?;
         self.connection.execute(
             "INSERT INTO catalog_items
              (kind, name, sku, unit, sale_price_minor, currency, track_inventory)
@@ -80,7 +87,7 @@ impl Database {
             params![
                 draft.kind,
                 draft.name,
-                draft.sku,
+                sku,
                 draft.unit,
                 draft.sale_price_minor
             ],
@@ -127,7 +134,7 @@ impl Database {
                     SELECT 1 FROM catalog_items
                     WHERE active = 1 AND (
                         (?1 IS NOT NULL AND sku = ?1 COLLATE NOCASE)
-                        OR (?1 IS NULL AND sku IS NULL AND kind = ?2 AND name = ?3 AND unit = ?4)
+                        OR (?1 IS NULL AND kind = ?2 AND name = ?3 AND unit = ?4)
                     )
                 )",
             )?;
@@ -146,10 +153,16 @@ impl Database {
                     result.duplicates += 1;
                     continue;
                 }
+                let next_id = transaction.query_row(
+                    "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'catalog_items'), 0) + 1",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )?;
+                let sku = resolved_sku(&transaction, &draft.kind, draft.sku.as_deref(), next_id)?;
                 let changed = statement.execute(params![
                     draft.kind,
                     draft.name,
-                    draft.sku,
+                    sku,
                     draft.unit,
                     draft.sale_price_minor
                 ])?;
@@ -163,4 +176,37 @@ impl Database {
         transaction.commit()?;
         Ok(result)
     }
+}
+
+fn resolved_sku(
+    connection: &rusqlite::Connection,
+    kind: &str,
+    supplied: Option<&str>,
+    id: i64,
+) -> Result<Option<String>, DatabaseError> {
+    if let Some(sku) = supplied.map(str::trim).filter(|sku| !sku.is_empty()) {
+        return Ok(Some(sku.to_owned()));
+    }
+    if kind != "product" {
+        return Ok(None);
+    }
+    let base = format!("NXR-P-{id:08}");
+    for suffix in 0..1_000 {
+        let candidate = if suffix == 0 {
+            base.clone()
+        } else {
+            format!("{base}-{suffix}")
+        };
+        let exists = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM catalog_items WHERE sku = ?1 COLLATE NOCASE AND id <> ?2)",
+            params![candidate, id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if !exists {
+            return Ok(Some(candidate));
+        }
+    }
+    Err(DatabaseError::Validation(
+        "unable to generate a unique product sku".into(),
+    ))
 }

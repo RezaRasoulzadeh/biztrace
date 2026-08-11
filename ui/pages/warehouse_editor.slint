@@ -1,0 +1,54 @@
+// ui/pages/warehouse_editor.slint
+
+import { IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlText, RtlTextField } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component WarehouseEditor inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <string> warehouse-id;
+    in-out property <string> warehouse-name;
+    in-out property <string> address;
+    in property <string> error-message;
+    callback save(string, string, string);
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+
+    FocusScope { width: parent.width; height: parent.height; focus-on-click: true; focus-on-tab-navigation: false; }
+
+    RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 18px;
+        width: min(560px, parent.width - 28px);
+        height: min(390px, parent.height - 28px);
+        animate y { duration: 180ms; easing: ease-out; }
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            HorizontalLayout {
+                height: 38px;
+                IconButton { icon: @image-url("../../assets/icons/x.svg"); label: "بستن"; clicked => { root.open = false; } }
+                RtlHeading { horizontal-stretch: 1; text: root.warehouse-id.is-empty ? "انبار جدید" : "ویرایش انبار"; font-size: 20px; }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+                ScrollView {
+                    width: parent.width - 8px;
+                    height: parent.height;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    VerticalLayout {
+                        padding-right: 22px;
+                        spacing: 14px;
+                        RtlTextField { label: "نام انبار:"; text <=> root.warehouse-name; placeholder-text: "مثلاً انبار مرکزی"; }
+                        RtlTextField { label: "نشانی:"; text <=> root.address; placeholder-text: "اختیاری"; }
+                        if !root.error-message.is-empty : RtlText { height: 24px; text: root.error-message; color: #ff9aaa; font-size: 12px; }
+                    }
+                }
+            }
+            RtlButton { height: 40px; text: root.warehouse-id.is-empty ? "ایجاد انبار" : "ذخیره تغییرات"; icon: @image-url("../../assets/icons/warehouse.svg"); clicked => { root.save(root.warehouse-id, root.warehouse-name, root.address); } }
+        }
+    }
+}

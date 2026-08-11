@@ -1,0 +1,58 @@
+// ui/pages/inventory_stock_row.slint
+
+import { IconButton, NexoraTheme, RtlText } from "../components/mod.slint";
+
+export struct StockItemData {
+    cost-layer-id: string,
+    warehouse-id: string,
+    item-id: string,
+    item-name: string,
+    sku: string,
+    warehouse-name: string,
+    warehouse-index: int,
+    unit-label: string,
+    quantity-label: string,
+    quantity-value: string,
+    inventory-value-label: string,
+    unit-cost-label: string,
+    unit-cost-value: string,
+}
+
+export component InventoryStockRow inherits Rectangle {
+    in property <StockItemData> item;
+    in property <bool> narrow;
+    in property <bool> show-details;
+    in property <bool> show-warehouse;
+    callback edit;
+    callback remove;
+    height: 62px;
+    background: hover.has-hover ? NexoraTheme.surface-raised : NexoraTheme.surface;
+    border-color: NexoraTheme.border;
+    border-width: 1px;
+    border-radius: 8px;
+    animate background { duration: 120ms; }
+
+    hover := TouchArea { mouse-cursor: pointer; }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 12px;
+        cross-axis-alignment: center;
+
+        IconButton { icon: @image-url("../../assets/icons/trash-2.svg"); label: "حذف از موجودی"; danger: true; clicked => { root.remove(); } }
+        IconButton { icon: @image-url("../../assets/icons/pencil.svg"); label: "ویرایش مقدار و بهای خرید"; clicked => { root.edit(); } }
+        RtlText { width: 100px; text: root.item.quantity-label; font-weight: 600; wrap: no-wrap; }
+        if !root.narrow : RtlText { width: 140px; text: root.item.unit-cost-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        if root.show-details : RtlText { width: 140px; text: root.item.inventory-value-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        if !root.narrow : RtlText { width: 90px; text: root.item.unit-label; color: NexoraTheme.text-muted; wrap: no-wrap; }
+        if root.show-warehouse : RtlText { width: root.show-details ? 150px : 120px; text: root.item.warehouse-name; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            min-width: 190px;
+            spacing: 1px;
+            RtlText { text: root.item.item-name; font-weight: 600; wrap: no-wrap; overflow: elide; }
+            RtlText { text: root.item.sku; color: NexoraTheme.text-faint; font-size: 12px; wrap: no-wrap; overflow: elide; }
+        }
+    }
+}

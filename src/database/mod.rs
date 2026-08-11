@@ -1,8 +1,13 @@
 // src/database/mod.rs
 
 mod catalog;
+mod inventory;
 
 pub use catalog::{CatalogDraft, CatalogImportResult, CatalogRecord};
+pub use inventory::{
+    InventoryImportResult, InventoryImportRow, InventoryMovementDraft, MovementRecord, StockRecord,
+    WarehouseRecord,
+};
 
 use std::env;
 use std::error::Error;
@@ -14,13 +19,33 @@ use std::time::Duration;
 use directories::ProjectDirs;
 use rusqlite::Connection;
 
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("../../migrations/0001_initial.sql"))];
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("../../migrations/0001_initial.sql")),
+    (
+        2,
+        include_str!("../../migrations/0002_optional_inventory_actor.sql"),
+    ),
+    (
+        3,
+        include_str!("../../migrations/0003_inventory_cost_layers.sql"),
+    ),
+    (
+        4,
+        include_str!("../../migrations/0004_inventory_layer_revisions.sql"),
+    ),
+    (5, include_str!("../../migrations/0005_product_skus.sql")),
+    (
+        6,
+        include_str!("../../migrations/0006_inventory_revision_warehouses.sql"),
+    ),
+];
 
 #[derive(Debug)]
 pub enum DatabaseError {
     DataDirectoryUnavailable,
     Io(std::io::Error),
     Sql(rusqlite::Error),
+    Validation(String),
 }
 
 impl fmt::Display for DatabaseError {
@@ -31,6 +56,7 @@ impl fmt::Display for DatabaseError {
             }
             Self::Io(error) => write!(formatter, "database filesystem error: {error}"),
             Self::Sql(error) => write!(formatter, "database error: {error}"),
+            Self::Validation(error) => formatter.write_str(error),
         }
     }
 }

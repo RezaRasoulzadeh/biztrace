@@ -1,0 +1,49 @@
+// ui/pages/warehouse_removal_dialog.slint
+
+import { IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText } from "../components/mod.slint";
+
+export component WarehouseRemovalDialog inherits Rectangle {
+    in-out property <bool> open;
+    in property <string> warehouse-name;
+    in property <bool> has-stock;
+    in property <[string]> alternative-names;
+    in property <[string]> alternative-ids;
+    in-out property <int> alternate-index;
+    in property <string> error-message;
+    callback remove-empty;
+    callback force-remove(string);
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+    FocusScope { width: parent.width; height: parent.height; focus-on-click: true; focus-on-tab-navigation: false; }
+    RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 16px;
+        width: min(560px, parent.width - 28px);
+        height: root.has-stock ? min(390px, parent.height - 28px) : min(270px, parent.height - 28px);
+        animate y { duration: 180ms; easing: ease-out; }
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            HorizontalLayout {
+                height: 38px;
+                IconButton { icon: @image-url("../../assets/icons/x.svg"); label: "بستن"; clicked => { root.open = false; } }
+                RtlHeading { horizontal-stretch: 1; text: "حذف انبار «" + root.warehouse-name + "»"; font-size: 19px; }
+            }
+            if !root.has-stock : RtlText { text: "این انبار موجودی فعالی ندارد و می‌توان آن را حذف کرد. سوابق قبلی حفظ می‌شوند."; color: NexoraTheme.text-muted; }
+            if root.has-stock : RtlText { height: 52px; text: "این انبار دارای کالا است. ابتدا می‌توانید موجودی آن را دستی مدیریت کنید، یا همه ردیف‌ها را به یک انبار جایگزین انتقال دهید."; color: NexoraTheme.text-muted; }
+            if root.has-stock && root.alternative-names.length > 0 : RtlSelectField { label: "انبار جایگزین:"; model: root.alternative-names; current-index <=> root.alternate-index; }
+            if root.has-stock && root.alternative-names.length == 0 : RtlText { height: 44px; text: "برای انتقال اجباری، ابتدا یک انبار دیگر ایجاد کنید."; color: #ff9aaa; }
+            if !root.error-message.is-empty : RtlText { height: 30px; text: root.error-message; color: #ff9aaa; font-size: 12px; }
+            Rectangle { vertical-stretch: 1; background: transparent; }
+            HorizontalLayout {
+                height: 40px;
+                spacing: 10px;
+                RtlButton { width: 120px; text: "انصراف"; primary: false; clicked => { root.open = false; } }
+                if !root.has-stock : RtlButton { horizontal-stretch: 1; text: "حذف انبار"; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { root.remove-empty(); } }
+                if root.has-stock && root.alternative-names.length > 0 : RtlButton { horizontal-stretch: 1; text: "انتقال همه و حذف"; icon: @image-url("../../assets/icons/arrow-left-right.svg"); clicked => { root.force-remove(root.alternative-ids[root.alternate-index]); } }
+            }
+        }
+    }
+}

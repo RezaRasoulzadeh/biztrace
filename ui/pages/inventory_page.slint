@@ -1,22 +1,183 @@
 // ui/pages/inventory_page.slint
 
-import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlTableHeaderCell, RtlTabs, RtlText, SearchOption, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
+import { InventoryMovementEditor } from "inventory_movement_editor.slint";
+import { InventoryMovementRow, MovementItemData } from "inventory_movement_row.slint";
+import { InventoryStockRow, StockItemData } from "inventory_stock_row.slint";
+import { StockLevelEditor } from "stock_level_editor.slint";
+import { WarehouseEditor } from "warehouse_editor.slint";
+import { WarehouseItemData, WarehouseRow } from "warehouse_row.slint";
+import { WarehouseRemovalDialog } from "warehouse_removal_dialog.slint";
 
 export component InventoryPage inherits Rectangle {
     in property <bool> narrow;
-    in property <int> warehouse-count;
-    callback create;
+    in property <[StockItemData]> items;
+    in property <[MovementItemData]> movements;
+    in property <[WarehouseItemData]> warehouse-items;
+    in property <[string]> warehouses;
+    in property <[string]> warehouse-alternative-names;
+    in property <[string]> warehouse-alternative-ids;
+    in property <[SearchOption]> product-options;
+    in-out property <string> search-text;
+    in-out property <bool> warehouse-editor-open;
+    in-out property <bool> movement-editor-open;
+    in-out property <bool> stock-editor-open;
+    in-out property <bool> warehouse-removal-open;
+    in property <string> editor-error;
+    callback search(string);
+    callback search-product(string);
+    callback save-warehouse(string, string, string);
+    callback format-price(string, int) -> FormattedInput;
+    callback record-movement(int, string, int, string, string, string);
+    callback set-stock(string, int, string, string, string);
+    callback remove-stock(string);
+    callback download-template;
+    callback import-excel;
+    callback remove-warehouse(string);
+    callback prepare-warehouse-removal(string);
+    callback force-remove-warehouse(string, string);
     background: transparent;
+    property <int> current-tab: 1;
+    property <bool> show-tips: root.width >= 1050px;
+    property <length> tips-width: 310px;
+    property <length> content-width: root.width - (root.show-tips ? root.tips-width : 0px);
+    property <bool> compact-content: root.narrow || root.content-width < 680px;
+    property <bool> show-stock-details: root.content-width >= 1050px;
+    property <bool> show-stock-warehouse: root.content-width >= 820px;
+    property <string> edit-warehouse-id;
+    property <string> edit-warehouse-name;
+    property <string> edit-warehouse-address;
+    property <string> edit-stock-warehouse-id;
+    property <string> edit-stock-item-id;
+    property <string> edit-stock-layer-id;
+    property <string> edit-stock-item-name;
+    property <string> edit-stock-warehouse-name;
+    property <int> edit-stock-warehouse-index;
+    property <string> edit-stock-current;
+    property <string> edit-stock-new;
+    property <string> edit-stock-cost;
+    property <string> edit-stock-reference;
+    property <string> pending-remove-layer-id;
+    property <string> pending-remove-item-name;
+    property <string> pending-remove-warehouse-id;
+    property <string> pending-remove-warehouse-name;
+    property <bool> pending-remove-warehouse-has-stock;
+    property <int> warehouse-alternate-index;
 
     ScrollView {
-        width: parent.width;
+        x: root.show-tips ? root.tips-width : 0px;
+        width: root.content-width;
         height: parent.height;
         VerticalLayout {
-            padding: root.narrow ? 14px : 28px;
-            spacing: 18px;
-            PageHeader { title: "موجودی و انبار"; description: "موجودی کالاها و گردش ورود و خروج"; action-text: "انبار جدید"; action-icon: @image-url("../../assets/icons/warehouse.svg"); narrow: root.narrow; action => { root.create(); } }
-            EmptyState { icon: @image-url("../../assets/icons/warehouse.svg"); title: "هنوز انباری تعریف نشده"; description: "برای کالاهای فیزیکی یک انبار ایجاد کنید."; action-text: "ایجاد انبار"; action-icon: @image-url("../../assets/icons/warehouse.svg"); action => { root.create(); } }
+            padding: root.compact-content ? 14px : 28px;
+            spacing: 14px;
+            alignment: start;
+            RtlHeading { text: "موجودی و انبار"; }
+            RtlText { text: "کنترل موجودی، مشاهده گردش‌ها و مدیریت محل‌های نگهداری"; color: NexoraTheme.text-muted; }
+            RtlTabs { tabs: ["گردش موجودی", "موجودی فعلی", "انبارها"]; current-index <=> root.current-tab; }
+            if root.current-tab == 1 : HorizontalLayout {
+                height: 40px;
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                RtlButton { width: root.compact-content ? 100px : 150px; text: "فایل نمونه"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.download-template(); } }
+                RtlButton { width: root.compact-content ? 100px : 150px; text: "ورود اکسل"; icon: @image-url("../../assets/icons/file-spreadsheet.svg"); primary: false; clicked => { root.import-excel(); } }
+                RtlButton { width: root.compact-content ? 130px : 180px; text: "ثبت ورود یا خروج"; icon: @image-url("../../assets/icons/package-plus.svg"); clicked => { movement-editor.selected-product-id = ""; movement-editor.selected-product-name = ""; movement-editor.product-query = ""; root.movement-editor-open = true; root.search-product(""); } }
+            }
+            if root.current-tab == 1 : RtlLineEdit { height: 40px; text <=> root.search-text; placeholder-text: "جستجو با نام کالا، کد یا انبار"; edited(value) => { root.search(value); } }
+            if root.current-tab == 1 : RtlText { height: 28px; text: root.items.length + " رکورد موجودی"; color: NexoraTheme.text-muted; font-size: 12px; }
+            if root.current-tab == 1 && root.items.length == 0 : EmptyState { icon: @image-url("../../assets/icons/warehouse.svg"); title: "موجودی ثبت نشده"; description: "یک انبار بسازید و ورود کالا را ثبت کنید."; action-text: "ایجاد انبار"; action-icon: @image-url("../../assets/icons/warehouse.svg"); action => { root.current-tab = 2; } }
+            if root.current-tab == 1 && root.items.length > 0 : HorizontalLayout {
+                height: 30px;
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 12px;
+                RtlTableHeaderCell { width: 80px; text: "عملیات"; }
+                RtlTableHeaderCell { width: 100px; text: "موجودی"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 140px; text: "بهای خرید واحد"; }
+                if root.show-stock-details : RtlTableHeaderCell { width: 140px; text: "بهای کل ردیف"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 90px; text: "واحد"; }
+                if root.show-stock-warehouse : RtlTableHeaderCell { width: root.show-stock-details ? 150px : 120px; text: "انبار"; }
+                RtlTableHeaderCell { horizontal-stretch: 1; text: "کالا"; }
+            }
+            if root.current-tab == 1 : VerticalLayout {
+                spacing: 8px;
+                for item in root.items : InventoryStockRow {
+                    item: item;
+                    narrow: root.compact-content;
+                    show-details: root.show-stock-details;
+                    show-warehouse: root.show-stock-warehouse;
+                    edit => {
+                        root.edit-stock-warehouse-id = item.warehouse-id;
+                        root.edit-stock-item-id = item.item-id;
+                        root.edit-stock-layer-id = item.cost-layer-id;
+                        root.edit-stock-item-name = item.item-name;
+                        root.edit-stock-warehouse-name = item.warehouse-name;
+                        root.edit-stock-warehouse-index = item.warehouse-index;
+                        root.edit-stock-current = item.quantity-label;
+                        root.edit-stock-new = item.quantity-value;
+                        root.edit-stock-cost = item.unit-cost-value;
+                        root.edit-stock-reference = "";
+                        root.stock-editor-open = true;
+                    }
+                    remove => {
+                        root.pending-remove-layer-id = item.cost-layer-id;
+                        root.pending-remove-item-name = item.item-name;
+                        remove-confirm.open = true;
+                    }
+                }
+            }
+            if root.current-tab == 0 : RtlText { height: 28px; text: "آخرین " + root.movements.length + " گردش ثبت‌شده"; color: NexoraTheme.text-muted; font-size: 12px; }
+            if root.current-tab == 0 && root.movements.length == 0 : EmptyState { icon: @image-url("../../assets/icons/scroll-text.svg"); title: "گردشی ثبت نشده"; description: "ورود، خروج و بهای تمام‌شده کالاها در این بخش دیده می‌شود."; action-text: ""; action-icon: @image-url("../../assets/icons/scroll-text.svg"); }
+            if root.current-tab == 0 && root.movements.length > 0 : HorizontalLayout {
+                height: 30px;
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 12px;
+                RtlTableHeaderCell { width: 100px; text: "تغییر"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 130px; text: "بهای کل"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 120px; text: "تاریخ"; }
+                if !root.compact-content : RtlTableHeaderCell { width: 140px; text: "انبار"; }
+                RtlTableHeaderCell { horizontal-stretch: 1; text: "کالا و مرجع"; }
+            }
+            if root.current-tab == 0 : VerticalLayout { spacing: 8px; for movement in root.movements : InventoryMovementRow { item: movement; narrow: root.compact-content; } }
+            if root.current-tab == 2 : HorizontalLayout {
+                height: 40px;
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                RtlButton { width: 160px; text: "انبار جدید"; icon: @image-url("../../assets/icons/warehouse.svg"); clicked => { root.edit-warehouse-id = ""; root.edit-warehouse-name = ""; root.edit-warehouse-address = ""; root.warehouse-editor-open = true; } }
+            }
+            if root.current-tab == 2 : RtlText { height: 28px; text: root.warehouse-items.length + " انبار فعال"; color: NexoraTheme.text-muted; font-size: 12px; }
+            if root.current-tab == 2 && root.warehouse-items.length == 0 : EmptyState { icon: @image-url("../../assets/icons/warehouse.svg"); title: "هنوز انباری ندارید"; description: "برای شروع مدیریت موجودی، محل نگهداری را بسازید."; action-text: "ایجاد انبار"; action-icon: @image-url("../../assets/icons/warehouse.svg"); action => { root.edit-warehouse-id = ""; root.edit-warehouse-name = ""; root.edit-warehouse-address = ""; root.warehouse-editor-open = true; } }
+            if root.current-tab == 2 : VerticalLayout { spacing: 8px; for warehouse in root.warehouse-items : WarehouseRow { item: warehouse; edit => { root.edit-warehouse-id = warehouse.id; root.edit-warehouse-name = warehouse.name; root.edit-warehouse-address = warehouse.address; root.warehouse-editor-open = true; } remove => { root.pending-remove-warehouse-id = warehouse.id; root.pending-remove-warehouse-name = warehouse.name; root.pending-remove-warehouse-has-stock = warehouse.has-stock; root.warehouse-alternate-index = 0; root.prepare-warehouse-removal(warehouse.id); root.warehouse-removal-open = true; } } }
         }
     }
+
+    Rectangle {
+        x: root.show-tips ? 0px : -root.tips-width;
+        width: root.tips-width;
+        height: parent.height;
+        background: NexoraTheme.surface;
+        opacity: root.show-tips ? 1 : 0;
+        visible: root.opacity > 0;
+        animate opacity { duration: 180ms; }
+        animate x { duration: 220ms; easing: ease-out; }
+        Rectangle { x: parent.width - 3px; width: 3px; height: parent.height; background: NexoraTheme.brand; }
+        VerticalLayout {
+            padding: 24px;
+            spacing: 8px;
+            HorizontalLayout { height: 46px; cross-axis-alignment: center; Rectangle { horizontal-stretch: 1; background: transparent; } RtlHeading { text: "موجودی قابل اعتماد"; font-size: 18px; } Rectangle { width: 32px; background: transparent; NexoraIcon { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 22px; height: 22px; source: @image-url("../../assets/icons/warehouse.svg"); tint: NexoraTheme.brand-soft; } } }
+            RtlText { height: 44px; text: "هر خرید یک ردیف مستقل با مقدار و بهای خرید خودش می‌سازد."; color: NexoraTheme.text-muted; font-size: 12px; }
+            TipRow { icon: @image-url("../../assets/icons/search.svg"); text: "کالا را با نام یا کد جستجو کنید؛ نام کالا همیشه در اولویت نمایش است."; }
+            TipRow { icon: @image-url("../../assets/icons/file-spreadsheet.svg"); text: "برای ورود تعداد زیاد، فایل نمونه را پر کرده و با اکسل وارد کنید."; }
+            TipRow { icon: @image-url("../../assets/icons/pencil.svg"); text: "مقدار و بهای خرید هر ردیف را مستقل ویرایش کنید."; }
+            TipRow { icon: @image-url("../../assets/icons/scroll-text.svg"); text: "گردش‌ها هزینه FIFO و سابقه انتقال‌ها را نگه می‌دارند."; }
+            TipRow { icon: @image-url("../../assets/icons/warehouse.svg"); text: "حذف انبار پُر فقط با انتقال موجودی به انبار جایگزین انجام می‌شود."; }
+        }
+    }
+
+    WarehouseEditor { width: parent.width; height: parent.height; open <=> root.warehouse-editor-open; warehouse-id <=> root.edit-warehouse-id; warehouse-name <=> root.edit-warehouse-name; address <=> root.edit-warehouse-address; error-message: root.editor-error; save(id, name, address) => { root.save-warehouse(id, name, address); } }
+    movement-editor := InventoryMovementEditor { width: parent.width; height: parent.height; open <=> root.movement-editor-open; warehouses: root.warehouses; product-options: root.product-options; error-message: root.editor-error; search-product(value) => { root.search-product(value); } format-price(value, cursor) => { return root.format-price(value, cursor); } save(warehouse, product, direction, quantity, cost, reference) => { root.record-movement(warehouse, product, direction, quantity, cost, reference); } }
+    StockLevelEditor { width: parent.width; height: parent.height; open <=> root.stock-editor-open; layer-id <=> root.edit-stock-layer-id; item-name <=> root.edit-stock-item-name; warehouse-name <=> root.edit-stock-warehouse-name; warehouses: root.warehouses; warehouse-index <=> root.edit-stock-warehouse-index; current-quantity <=> root.edit-stock-current; new-quantity <=> root.edit-stock-new; unit-cost <=> root.edit-stock-cost; reference <=> root.edit-stock-reference; error-message: root.editor-error; format-price(value, cursor) => { return root.format-price(value, cursor); } save(layer, warehouse, quantity, cost, reference) => { root.set-stock(layer, warehouse, quantity, cost, reference); } }
+    remove-confirm := ConfirmDialog { width: parent.width; height: parent.height; title: "حذف ردیف موجودی"; message: "ردیف «" + root.pending-remove-item-name + "» و مقدار باقی‌مانده آن از موجودی حذف شود؟"; confirm-text: "حذف"; confirmed => { root.remove-stock(root.pending-remove-layer-id); } }
+    WarehouseRemovalDialog { width: parent.width; height: parent.height; open <=> root.warehouse-removal-open; warehouse-name: root.pending-remove-warehouse-name; has-stock: root.pending-remove-warehouse-has-stock; alternative-names: root.warehouse-alternative-names; alternative-ids: root.warehouse-alternative-ids; alternate-index <=> root.warehouse-alternate-index; error-message: root.editor-error; remove-empty => { root.remove-warehouse(root.pending-remove-warehouse-id); } force-remove(alternate) => { root.force-remove-warehouse(root.pending-remove-warehouse-id, alternate); } }
 }

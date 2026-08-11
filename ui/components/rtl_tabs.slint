@@ -1,0 +1,25 @@
+// ui/components/rtl_tabs.slint
+
+import { NexoraTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component RtlTabs inherits Rectangle {
+    in property <[string]> tabs;
+    in-out property <int> current-index;
+    height: 42px;
+    background: NexoraTheme.surface;
+    border-radius: 8px;
+
+    HorizontalLayout {
+        padding: 4px;
+        spacing: 4px;
+        for tab[index] in root.tabs : Rectangle {
+            horizontal-stretch: 1;
+            background: index == root.current-index ? NexoraTheme.control-hover : tab-touch.has-hover ? NexoraTheme.control : transparent;
+            border-radius: 6px;
+            animate background { duration: 120ms; }
+            RtlText { text: tab; color: index == root.current-index ? NexoraTheme.text : NexoraTheme.text-muted; horizontal-alignment: center; font-weight: index == root.current-index ? 600 : 400; }
+            tab-touch := TouchArea { clicked => { root.current-index = index; } }
+        }
+    }
+}

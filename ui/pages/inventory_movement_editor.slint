@@ -1,0 +1,65 @@
+// ui/pages/inventory_movement_editor.slint
+
+import { FormattedInput, IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField, SearchOption, SearchPicker } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component InventoryMovementEditor inherits Rectangle {
+    in-out property <bool> open;
+    in property <[string]> warehouses;
+    in property <[SearchOption]> product-options;
+    in-out property <int> warehouse-index;
+    in-out property <string> product-query;
+    in-out property <string> selected-product-id;
+    in-out property <string> selected-product-name;
+    in-out property <int> direction-index;
+    in-out property <string> quantity;
+    in-out property <string> unit-cost;
+    in-out property <string> reference;
+    in property <string> error-message;
+    callback search-product(string);
+    callback format-price(string, int) -> FormattedInput;
+    callback save(int, string, int, string, string, string);
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+    FocusScope { width: parent.width; height: parent.height; focus-on-click: true; focus-on-tab-navigation: false; }
+    RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 18px;
+        width: min(600px, parent.width - 28px);
+        height: min(620px, parent.height - 28px);
+        animate y { duration: 180ms; easing: ease-out; }
+        VerticalLayout {
+            padding: 22px;
+            spacing: 12px;
+            HorizontalLayout {
+                height: 38px;
+                IconButton { icon: @image-url("../../assets/icons/x.svg"); label: "بستن"; clicked => { root.open = false; } }
+                RtlHeading { horizontal-stretch: 1; text: "ثبت تغییر موجودی"; font-size: 20px; }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+                ScrollView {
+                    width: parent.width - 8px;
+                    height: parent.height;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    VerticalLayout {
+                        padding-right: 22px;
+                        spacing: 13px;
+                        RtlSelectField { label: "عملیات:"; model: ["ورود به انبار", "خروج از انبار"]; current-index <=> root.direction-index; }
+                        RtlSelectField { label: "انبار:"; model: root.warehouses; current-index <=> root.warehouse-index; }
+                        RtlText { height: 24px; text: "کالا:"; font-weight: 600; }
+                        SearchPicker { options: root.product-options; query <=> root.product-query; selected-id <=> root.selected-product-id; selected-label <=> root.selected-product-name; placeholder-text: "نام یا کد کالا را جستجو کنید"; search(value) => { root.search-product(value); } }
+                        RtlTextField { label: "مقدار:"; text <=> root.quantity; placeholder-text: "مثلاً ۱۲ یا ۱٫۵"; }
+                        if root.direction-index == 0 : RtlTextField { label: "قیمت خرید هر واحد:"; text <=> root.unit-cost; placeholder-text: "ریال"; numeric-mode: true; format-numeric(value, cursor) => { return root.format-price(value, cursor); } }
+                        RtlTextField { label: "مرجع:"; text <=> root.reference; placeholder-text: "اختیاری"; }
+                        if !root.error-message.is-empty : RtlText { height: 28px; text: root.error-message; color: #ff9aaa; font-size: 12px; }
+                    }
+                }
+            }
+            RtlButton { height: 40px; text: "ثبت موجودی"; icon: @image-url("../../assets/icons/check.svg"); clicked => { root.save(root.warehouse-index, root.selected-product-id, root.direction-index, root.quantity, root.unit-cost, root.reference); } }
+        }
+    }
+}
