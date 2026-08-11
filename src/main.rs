@@ -1,22 +1,20 @@
 // src/main.rs
 
+use nexora::database::Database;
+
 slint::include_modules!();
 
-fn main() -> Result<(), slint::PlatformError> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let database = Database::open_default()?;
+    let counts = database.overview_counts()?;
     let app = AppWindow::new()?;
-    let weak = app.as_weak();
+    app.set_invoice_count(counts.invoices);
+    app.set_customer_count(counts.customers);
+    app.set_catalog_count(counts.catalog_items);
+    app.set_warehouse_count(counts.warehouses);
+    app.set_fund_account_count(counts.fund_accounts);
+    app.set_transaction_count(counts.fund_transactions);
+    app.set_user_count(counts.users);
 
-    app.on_submit(move || {
-        if let Some(app) = weak.upgrade() {
-            let name = app.get_customer_name();
-            let message = if name.trim().is_empty() {
-                "نام مشتری را وارد کنید".into()
-            } else {
-                format!("«{name}» با موفقیت ثبت آزمایشی شد").into()
-            };
-            app.set_status_message(message);
-        }
-    });
-
-    app.run()
+    Ok(app.run()?)
 }

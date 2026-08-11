@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+directories = "6.0.0"
 fontique = { version = "0.10.0", features = ["fontconfig-dlopen"] }
+rusqlite = { version = "0.40.1", features = ["bundled"] }
 slint = "1.17.1"
 
 [build-dependencies]

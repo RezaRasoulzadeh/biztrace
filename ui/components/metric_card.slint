@@ -1,0 +1,44 @@
+// ui/components/metric_card.slint
+
+import { NexoraIcon } from "nexora_icon.slint";
+import { NexoraTheme } from "theme.slint";
+import { RtlCard } from "rtl_card.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component MetricCard inherits RtlCard {
+    in property <image> icon;
+    in property <string> label;
+    in property <int> value;
+    height: 104px;
+
+    NexoraIcon {
+        x: 16px;
+        y: 16px;
+        width: 24px;
+        height: 24px;
+        source: root.icon;
+        tint: NexoraTheme.brand-soft;
+    }
+
+    RtlText {
+        x: 52px;
+        y: 12px;
+        width: parent.width - 68px;
+        height: 30px;
+        text: root.label;
+        color: NexoraTheme.text-muted;
+        wrap: no-wrap;
+        overflow: elide;
+    }
+
+    RtlText {
+        x: 16px;
+        y: 48px;
+        width: parent.width - 32px;
+        height: 40px;
+        text: root.value;
+        font-size: 27px;
+        font-weight: 700;
+        wrap: no-wrap;
+    }
+}

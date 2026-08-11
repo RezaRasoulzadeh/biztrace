@@ -1,136 +1,136 @@
 // ui/app.slint
 
+import { NexoraTheme, RtlSidebar, RtlToast, RtlTopNav } from "components/mod.slint";
 import {
-    NexoraTheme,
-    ProductRow,
-    RtlButton,
-    RtlCard,
-    RtlHeading,
-    RtlSelectField,
-    RtlSidebar,
-    RtlTableHeaderCell,
-    RtlText,
-    RtlTextField,
-    RtlTopNav,
-    RtlToast
-} from "components/mod.slint";
-import { ScrollView } from "std-widgets.slint";
+    CatalogPage,
+    CustomersPage,
+    DashboardPage,
+    FundsPage,
+    InventoryPage,
+    InvoicesPage,
+    SettingsPage,
+    UsersPage
+} from "pages/mod.slint";
 
 export component AppWindow inherits Window {
-    title: "Nexora — Slint RTL Components Test";
-    preferred-width: 920px;
-    preferred-height: 740px;
+    title: "Nexora";
+    preferred-width: 1080px;
+    preferred-height: 720px;
     min-width: 420px;
     min-height: 480px;
     background: NexoraTheme.canvas;
     default-font-family: NexoraTheme.font-family;
 
-    in-out property <string> customer-name;
-    in-out property <string> phone-number;
-    in-out property <string> status-message: "آماده برای آزمایش ورودی و چیدمان راست‌به‌چپ";
     in-out property <int> navigation-index;
     in-out property <bool> navigation-expanded: true;
+    in property <int> invoice-count;
+    in property <int> customer-count;
+    in property <int> catalog-count;
+    in property <int> warehouse-count;
+    in property <int> fund-account-count;
+    in property <int> transaction-count;
+    in property <int> user-count;
+    in-out property <string> status-message;
     property <bool> compact-navigation: !root.navigation-expanded || root.width < 620px;
     property <length> workspace-width: root.width - sidebar.width;
-    callback submit;
+    property <bool> narrow-content: root.workspace-width < 640px;
 
-    ScrollView {
+    if root.navigation-index == 0 : DashboardPage {
         x: 0;
         y: top-nav.height;
         width: root.workspace-width;
         height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        invoice-count: root.invoice-count;
+        customer-count: root.customer-count;
+        catalog-count: root.catalog-count;
+        transaction-count: root.transaction-count;
+    }
 
-        VerticalLayout {
-            padding: root.workspace-width < 620px ? 14px : 28px;
-            spacing: root.workspace-width < 620px ? 14px : 18px;
-
-            RtlHeading { text: "آزمون مؤلفه‌های راست‌به‌چپ Nexora"; }
-
-            RtlText {
-                text: "تایپ فارسی، انتخاب با ماوس، کلیدهای جهت، Home/End، حذف و ترکیب فارسی با اعداد و انگلیسی را آزمایش کنید";
-                color: NexoraTheme.text-muted;
-            }
-
-            RtlCard {
-                height: root.workspace-width < 620px ? 352px : 220px;
-
-                VerticalLayout {
-                    padding: 18px;
-                    spacing: 12px;
-
-                    RtlTextField {
-                        label: "نام مشتری:";
-                        text <=> root.customer-name;
-                        placeholder-text: "نام مشتری را وارد کنید";
-                    }
-
-                    RtlTextField {
-                        label: "شماره تلفن:";
-                        text <=> root.phone-number;
-                        placeholder-text: "۰۹۱۲۳۴۵۶۷۸۹";
-                    }
-
-                    RtlSelectField {
-                        label: "نقش:";
-                        model: ["مدیر کل", "مدیر فروش", "کارمند"];
-                    }
-
-                    RtlButton {
-                        text: "ثبت آزمایشی";
-                        clicked => {
-                            root.submit();
-                            toast.open = true;
-                        }
-                    }
-                }
-            }
-
-            RtlText {
-                text: "متن ترکیبی — کالا: چای احمد  |  کد: SKU-1001  |  تلفن: +98 912 345 6789";
-                height: 38px;
-                wrap: no-wrap;
-                overflow: elide;
-            }
-
-            RtlHeading { text: "لیست کالاها"; }
-
-            HorizontalLayout {
-                height: 30px;
-                padding-left: 12px;
-                padding-right: 12px;
-                spacing: root.workspace-width < 500px ? 10px : 18px;
-
-                RtlTableHeaderCell { width: root.workspace-width < 500px ? 54px : 80px; text: "موجودی"; }
-                if root.workspace-width >= 500px : RtlTableHeaderCell { width: 150px; text: "قیمت (ریال)"; }
-                if root.workspace-width >= 680px : RtlTableHeaderCell { width: 130px; text: "کد کالا"; }
-                RtlTableHeaderCell { horizontal-stretch: 1; text: "نام کالا"; }
-            }
-
-            ProductRow {
-                product-name: "چای احمد ۵۰۰ گرمی";
-                sku: "SKU-1001";
-                price: "1,250,000 ریال";
-                stock: "42";
-                compact: root.workspace-width < 680px;
-                narrow: root.workspace-width < 500px;
-            }
-            ProductRow {
-                product-name: "برنج طارم درجه یک";
-                sku: "SKU-1002";
-                price: "4,800,000 ریال";
-                stock: "15";
-                compact: root.workspace-width < 680px;
-                narrow: root.workspace-width < 500px;
-            }
-            ProductRow {
-                product-name: "روغن آفتابگردان";
-                sku: "SKU-1003";
-                price: "980,000 ریال";
-                stock: "0";
-                compact: root.workspace-width < 680px;
-                narrow: root.workspace-width < 500px;
-            }
+    if root.navigation-index == 1 : InvoicesPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        item-count: root.invoice-count;
+        create => {
+            root.status-message = "فرایند صدور فاکتور در مرحله بعد اضافه می‌شود";
+            toast.open = true;
         }
+    }
+
+    if root.navigation-index == 2 : CatalogPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        item-count: root.catalog-count;
+        create => {
+            root.status-message = "فرم ثبت کالا و خدمت در مرحله بعد اضافه می‌شود";
+            toast.open = true;
+        }
+    }
+
+    if root.navigation-index == 3 : CustomersPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        item-count: root.customer-count;
+        create => {
+            root.status-message = "فرم ثبت مشتری در مرحله بعد اضافه می‌شود";
+            toast.open = true;
+        }
+    }
+
+    if root.navigation-index == 4 : InventoryPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        warehouse-count: root.warehouse-count;
+        create => {
+            root.status-message = "فرم ایجاد انبار در مرحله بعد اضافه می‌شود";
+            toast.open = true;
+        }
+    }
+
+    if root.navigation-index == 5 : FundsPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        account-count: root.fund-account-count;
+        create => {
+            root.status-message = "فرم ایجاد حساب مالی در مرحله بعد اضافه می‌شود";
+            toast.open = true;
+        }
+    }
+
+    if root.navigation-index == 6 : UsersPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
+        item-count: root.user-count;
+        create => {
+            root.status-message = "مدیریت کاربران همراه راه‌اندازی مدیر اصلی تکمیل می‌شود";
+            toast.open = true;
+        }
+    }
+
+    if root.navigation-index == 7 : SettingsPage {
+        x: 0;
+        y: top-nav.height;
+        width: root.workspace-width;
+        height: parent.height - top-nav.height;
+        narrow: root.narrow-content;
     }
 
     sidebar := RtlSidebar {
@@ -144,10 +144,12 @@ export component AppWindow inherits Window {
         }
         items: [
             { label: "داشبورد", icon: @image-url("../assets/icons/layout-dashboard.svg") },
-            { label: "فروش", icon: @image-url("../assets/icons/shopping-cart.svg") },
-            { label: "کالاها", icon: @image-url("../assets/icons/package.svg") },
+            { label: "فاکتورها", icon: @image-url("../assets/icons/receipt-text.svg") },
+            { label: "کالاها و خدمات", icon: @image-url("../assets/icons/package.svg") },
             { label: "مشتریان", icon: @image-url("../assets/icons/users.svg") },
-            { label: "گزارش‌ها", icon: @image-url("../assets/icons/chart-bar.svg") },
+            { label: "موجودی و انبار", icon: @image-url("../assets/icons/warehouse.svg") },
+            { label: "وجوه و حساب‌ها", icon: @image-url("../assets/icons/wallet-cards.svg") },
+            { label: "کاربران", icon: @image-url("../assets/icons/user-round-cog.svg") },
             { label: "تنظیمات", icon: @image-url("../assets/icons/settings.svg") }
         ];
     }
@@ -156,11 +158,13 @@ export component AppWindow inherits Window {
         x: 0;
         y: 0;
         width: parent.width;
-        page-title: root.navigation-index == 0 ? "داشبورد مدیریت" :
-            root.navigation-index == 1 ? "مدیریت فروش" :
-            root.navigation-index == 2 ? "مدیریت کالاها" :
-            root.navigation-index == 3 ? "مدیریت مشتریان" :
-            root.navigation-index == 4 ? "گزارش‌ها" : "تنظیمات";
+        page-title: root.navigation-index == 0 ? "داشبورد" :
+            root.navigation-index == 1 ? "فاکتورها" :
+            root.navigation-index == 2 ? "کالاها و خدمات" :
+            root.navigation-index == 3 ? "مشتریان" :
+            root.navigation-index == 4 ? "موجودی و انبار" :
+            root.navigation-index == 5 ? "وجوه و حساب‌ها" :
+            root.navigation-index == 6 ? "کاربران و نقش‌ها" : "تنظیمات";
         user-name: "مدیر سیستم";
     }
 

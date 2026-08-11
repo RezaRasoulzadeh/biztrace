@@ -1,0 +1,53 @@
+// ui/components/empty_state.slint
+
+import { NexoraIcon } from "nexora_icon.slint";
+import { NexoraTheme } from "theme.slint";
+import { RtlButton } from "rtl_button.slint";
+import { RtlCard } from "rtl_card.slint";
+import { RtlText } from "rtl_text.slint";
+
+export component EmptyState inherits RtlCard {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> description;
+    in property <string> action-text;
+    in property <image> action-icon;
+    callback action;
+    height: 250px;
+
+    VerticalLayout {
+        padding: 28px;
+        spacing: 10px;
+        alignment: center;
+
+        NexoraIcon {
+            width: 34px;
+            height: 34px;
+            source: root.icon;
+            tint: NexoraTheme.brand-soft;
+        }
+
+        RtlText {
+            height: 28px;
+            text: root.title;
+            font-size: 17px;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+
+        RtlText {
+            height: 44px;
+            text: root.description;
+            color: NexoraTheme.text-muted;
+            horizontal-alignment: center;
+        }
+
+        RtlButton {
+            width: 180px;
+            height: 38px;
+            text: root.action-text;
+            icon: root.action-icon;
+            clicked => { root.action(); }
+        }
+    }
+}

@@ -1,0 +1,22 @@
+// ui/pages/catalog_page.slint
+
+import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component CatalogPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> item-count;
+    callback create;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+            PageHeader { title: "کالاها و خدمات"; description: "مدیریت اقلام قابل فروش و قیمت‌گذاری"; action-text: "مورد جدید"; action-icon: @image-url("../../assets/icons/package-plus.svg"); narrow: root.narrow; action => { root.create(); } }
+            EmptyState { icon: @image-url("../../assets/icons/package-plus.svg"); title: "فهرست فروش خالی است"; description: "یک کالا یا خدمت به فهرست کسب‌وکار اضافه کنید."; action-text: "افزودن مورد"; action-icon: @image-url("../../assets/icons/package-plus.svg"); action => { root.create(); } }
+        }
+    }
+}

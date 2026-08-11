@@ -1,0 +1,22 @@
+// ui/pages/inventory_page.slint
+
+import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component InventoryPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> warehouse-count;
+    callback create;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+            PageHeader { title: "موجودی و انبار"; description: "موجودی کالاها و گردش ورود و خروج"; action-text: "انبار جدید"; action-icon: @image-url("../../assets/icons/warehouse.svg"); narrow: root.narrow; action => { root.create(); } }
+            EmptyState { icon: @image-url("../../assets/icons/warehouse.svg"); title: "هنوز انباری تعریف نشده"; description: "برای کالاهای فیزیکی یک انبار ایجاد کنید."; action-text: "ایجاد انبار"; action-icon: @image-url("../../assets/icons/warehouse.svg"); action => { root.create(); } }
+        }
+    }
+}

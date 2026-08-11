@@ -1,0 +1,59 @@
+// ui/pages/dashboard_page.slint
+
+import { MetricCard, NexoraTheme, RtlCard, RtlHeading, RtlText } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component DashboardPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> invoice-count;
+    in property <int> customer-count;
+    in property <int> catalog-count;
+    in property <int> transaction-count;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+
+            RtlHeading { text: "داشبورد"; }
+            RtlText {
+                text: "نمای کلی فعالیت‌های کسب‌وکار";
+                color: NexoraTheme.text-muted;
+            }
+
+            if root.narrow : VerticalLayout {
+                spacing: 10px;
+                MetricCard { icon: @image-url("../../assets/icons/receipt-text.svg"); label: "فاکتورها"; value: root.invoice-count; }
+                MetricCard { icon: @image-url("../../assets/icons/users.svg"); label: "مشتریان"; value: root.customer-count; }
+                MetricCard { icon: @image-url("../../assets/icons/package.svg"); label: "کالاها و خدمات"; value: root.catalog-count; }
+                MetricCard { icon: @image-url("../../assets/icons/wallet-cards.svg"); label: "تراکنش‌های مالی"; value: root.transaction-count; }
+            }
+
+            if !root.narrow : HorizontalLayout {
+                spacing: 12px;
+                MetricCard { horizontal-stretch: 1; icon: @image-url("../../assets/icons/receipt-text.svg"); label: "فاکتورها"; value: root.invoice-count; }
+                MetricCard { horizontal-stretch: 1; icon: @image-url("../../assets/icons/users.svg"); label: "مشتریان"; value: root.customer-count; }
+                MetricCard { horizontal-stretch: 1; icon: @image-url("../../assets/icons/package.svg"); label: "کالاها و خدمات"; value: root.catalog-count; }
+                MetricCard { horizontal-stretch: 1; icon: @image-url("../../assets/icons/wallet-cards.svg"); label: "تراکنش‌های مالی"; value: root.transaction-count; }
+            }
+
+            RtlCard {
+                height: 180px;
+
+                VerticalLayout {
+                    padding: 22px;
+                    spacing: 8px;
+                    RtlHeading { text: "شروع کار با Nexora"; font-size: 18px; }
+                    RtlText {
+                        text: "ابتدا کالاها یا خدمات، مشتریان و حساب‌های مالی را ثبت کنید. سپس می‌توانید فاکتور صادر کنید و گردش موجودی و وجوه را پیگیری کنید.";
+                        color: NexoraTheme.text-muted;
+                    }
+                }
+            }
+        }
+    }
+}

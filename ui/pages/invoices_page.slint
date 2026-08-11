@@ -1,0 +1,22 @@
+// ui/pages/invoices_page.slint
+
+import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component InvoicesPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> item-count;
+    callback create;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+            PageHeader { title: "فاکتورها"; description: "صدور و پیگیری وضعیت پرداخت فاکتورها"; action-text: "فاکتور جدید"; action-icon: @image-url("../../assets/icons/file-plus.svg"); narrow: root.narrow; action => { root.create(); } }
+            EmptyState { icon: @image-url("../../assets/icons/receipt-text.svg"); title: "هنوز فاکتوری صادر نشده"; description: "اولین فاکتور فروش یا خدمات را ایجاد کنید."; action-text: "صدور فاکتور"; action-icon: @image-url("../../assets/icons/file-plus.svg"); action => { root.create(); } }
+        }
+    }
+}

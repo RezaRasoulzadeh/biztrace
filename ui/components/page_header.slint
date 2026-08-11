@@ -1,0 +1,44 @@
+// ui/components/page_header.slint
+
+import { RtlButton } from "rtl_button.slint";
+import { RtlHeading } from "rtl_heading.slint";
+import { RtlText } from "rtl_text.slint";
+import { NexoraTheme } from "theme.slint";
+
+export component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <string> action-text;
+    in property <image> action-icon;
+    in property <bool> narrow;
+    callback action;
+    height: root.narrow ? 116px : 72px;
+    background: transparent;
+
+    if root.narrow : VerticalLayout {
+        spacing: 8px;
+
+        RtlHeading { text: root.title; }
+        RtlText { text: root.description; color: NexoraTheme.text-muted; }
+        RtlButton { height: 36px; text: root.action-text; icon: root.action-icon; clicked => { root.action(); } }
+    }
+
+    if !root.narrow : HorizontalLayout {
+        spacing: 18px;
+
+        RtlButton {
+            width: 156px;
+            height: 38px;
+            text: root.action-text;
+            icon: root.action-icon;
+            clicked => { root.action(); }
+        }
+
+        VerticalLayout {
+            spacing: 2px;
+
+            RtlHeading { text: root.title; }
+            RtlText { text: root.description; color: NexoraTheme.text-muted; }
+        }
+    }
+}

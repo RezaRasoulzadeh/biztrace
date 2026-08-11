@@ -35,8 +35,8 @@ export component RtlSidebar inherits Rectangle {
             NexoraIcon {
                 x: root.compact ? (parent.width - self.width) / 2 : 10px;
                 y: (parent.height - self.height) / 2;
-                width: 22px;
-                height: 22px;
+                width: 18px;
+                height: 18px;
                 source: root.compact ? @image-url("../../assets/icons/panel-left-open.svg") : @image-url("../../assets/icons/panel-right-close.svg");
                 tint: NexoraTheme.text-muted;
                 animate x { duration: 220ms; easing: ease-in-out; }
@@ -46,7 +46,6 @@ export component RtlSidebar inherits Rectangle {
                 x: 48px;
                 width: parent.width - 58px;
                 height: parent.height;
-                text: "جمع کردن";
                 color: NexoraTheme.text-faint;
                 font-size: 12px;
                 wrap: no-wrap;
@@ -77,11 +76,18 @@ export component RtlSidebar inherits Rectangle {
                     overflow: elide;
                 }
 
-                NexoraIcon {
+                Rectangle {
                     width: 24px;
-                    height: 24px;
-                    source: item.icon;
-                    tint: index == root.current-index ? white : NexoraTheme.text-muted;
+                    background: transparent;
+
+                    NexoraIcon {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        width: 19px;
+                        height: 19px;
+                        source: item.icon;
+                        tint: index == root.current-index ? white : NexoraTheme.text-muted;
+                    }
                 }
             }
 

@@ -1,0 +1,22 @@
+// ui/pages/customers_page.slint
+
+import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component CustomersPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> item-count;
+    callback create;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+            PageHeader { title: "مشتریان"; description: "اشخاص و کسب‌وکارهای طرف حساب"; action-text: "مشتری جدید"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); narrow: root.narrow; action => { root.create(); } }
+            EmptyState { icon: @image-url("../../assets/icons/user-round-plus.svg"); title: "هنوز مشتری ثبت نشده"; description: "مشتریان حقیقی یا حقوقی را اینجا اضافه کنید."; action-text: "افزودن مشتری"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); action => { root.create(); } }
+        }
+    }
+}

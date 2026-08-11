@@ -1,0 +1,22 @@
+// ui/pages/users_page.slint
+
+import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component UsersPage inherits Rectangle {
+    in property <bool> narrow;
+    in property <int> item-count;
+    callback create;
+    background: transparent;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: root.narrow ? 14px : 28px;
+            spacing: 18px;
+            PageHeader { title: "کاربران و نقش‌ها"; description: "دسترسی اعضای کسب‌وکار به Nexora"; action-text: "کاربر جدید"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); narrow: root.narrow; action => { root.create(); } }
+            EmptyState { icon: @image-url("../../assets/icons/user-round-cog.svg"); title: "کاربری برای نمایش وجود ندارد"; description: "ایجاد کاربر اصلی را بعداً همراه راه‌اندازی اولیه تکمیل می‌کنیم."; action-text: "افزودن کاربر"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); action => { root.create(); } }
+        }
+    }
+}
