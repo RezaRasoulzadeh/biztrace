@@ -5,7 +5,7 @@ use nexora::database::{CatalogDraft, Database, InventoryImportRow, InventoryMove
 #[test]
 fn initial_schema_is_created_and_versioned() {
     let database = Database::open_in_memory().unwrap();
-    assert_eq!(database.schema_version().unwrap(), 6);
+    assert_eq!(database.schema_version().unwrap(), 8);
     assert_eq!(database.overview_counts().unwrap(), Default::default());
 }
 
@@ -29,6 +29,7 @@ fn fifo_cost_layers_preserve_purchase_prices_for_profit_calculation() {
             .record_inventory_movement(&InventoryMovementDraft {
                 warehouse_id,
                 item_id,
+                cost_layer_id: None,
                 quantity_milliunits,
                 increases_stock: true,
                 unit_cost_minor: Some(unit_cost_minor),
@@ -40,6 +41,7 @@ fn fifo_cost_layers_preserve_purchase_prices_for_profit_calculation() {
         .record_inventory_movement(&InventoryMovementDraft {
             warehouse_id,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: 150_000,
             increases_stock: false,
             unit_cost_minor: None,
@@ -50,6 +52,74 @@ fn fifo_cost_layers_preserve_purchase_prices_for_profit_calculation() {
     let issue = database.movement_records().unwrap().remove(0);
     assert_eq!(issue.total_cost_minor, Some(6_500_000_000));
     assert_eq!(issue.unit_cost_minor, Some(43_333_333));
+    let remaining = database.stock_records("").unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].acquired_quantity_milliunits, 100_000);
+    assert_eq!(remaining[0].quantity_milliunits, 50_000);
+}
+
+#[test]
+fn row_outgoing_decreases_only_the_selected_cost_layer() {
+    let database = Database::open_in_memory().unwrap();
+    let item_id = database
+        .save_catalog_item(&CatalogDraft {
+            id: None,
+            kind: "product".into(),
+            name: "Layered coffee".into(),
+            sku: Some("COFFEE-LAYERS".into()),
+            unit: "kilogram".into(),
+            sale_price_minor: 70_000_000,
+        })
+        .unwrap();
+    let warehouse_id = database.create_warehouse("Main", None).unwrap();
+    for unit_cost_minor in [40_000_000, 50_000_000] {
+        database
+            .record_inventory_movement(&InventoryMovementDraft {
+                warehouse_id,
+                item_id,
+                cost_layer_id: None,
+                quantity_milliunits: 100_000,
+                increases_stock: true,
+                unit_cost_minor: Some(unit_cost_minor),
+                reference: None,
+            })
+            .unwrap();
+    }
+    let layers = database.stock_records("").unwrap();
+    let selected_layer_id = layers
+        .iter()
+        .find(|layer| layer.unit_cost_minor == 50_000_000)
+        .unwrap()
+        .cost_layer_id;
+    database
+        .record_inventory_movement(&InventoryMovementDraft {
+            warehouse_id,
+            item_id,
+            cost_layer_id: Some(selected_layer_id),
+            quantity_milliunits: 25_000,
+            increases_stock: false,
+            unit_cost_minor: None,
+            reference: None,
+        })
+        .unwrap();
+
+    let layers = database.stock_records("").unwrap();
+    assert_eq!(
+        layers
+            .iter()
+            .find(|layer| layer.unit_cost_minor == 40_000_000)
+            .unwrap()
+            .quantity_milliunits,
+        100_000
+    );
+    assert_eq!(
+        layers
+            .iter()
+            .find(|layer| layer.unit_cost_minor == 50_000_000)
+            .unwrap()
+            .quantity_milliunits,
+        75_000
+    );
 }
 
 #[test]
@@ -70,6 +140,7 @@ fn inventory_batch_quantity_and_unit_cost_can_be_edited() {
         .record_inventory_movement(&InventoryMovementDraft {
             warehouse_id,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: 100_000,
             increases_stock: true,
             unit_cost_minor: Some(40_000_000),
@@ -90,6 +161,7 @@ fn inventory_batch_quantity_and_unit_cost_can_be_edited() {
 
     let record = &database.stock_records("").unwrap()[0];
     assert_eq!(record.quantity_milliunits, 90_000);
+    assert_eq!(record.acquired_quantity_milliunits, 90_000);
     assert_eq!(record.unit_cost_minor, 42_000_000);
     assert_eq!(record.inventory_value_minor, 3_780_000_000);
 
@@ -168,6 +240,7 @@ fn populated_warehouse_requires_transfer_before_removal() {
         .record_inventory_movement(&InventoryMovementDraft {
             warehouse_id: source,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: 25_000,
             increases_stock: true,
             unit_cost_minor: Some(40_000_000),
@@ -228,6 +301,84 @@ fn catalog_items_can_be_created_searched_updated_and_removed() {
 
     database.remove_catalog_item(id).unwrap();
     assert!(database.catalog_items("").unwrap().is_empty());
+}
+
+#[test]
+fn archived_inventory_keeps_history_without_blocking_catalog_removal() {
+    let database = Database::open_in_memory().unwrap();
+    let item_id = database
+        .save_catalog_item(&CatalogDraft {
+            id: None,
+            kind: "product".into(),
+            name: "Archived coffee".into(),
+            sku: Some("COFFEE-ARCHIVED".into()),
+            unit: "kilogram".into(),
+            sale_price_minor: 70_000_000,
+        })
+        .unwrap();
+    let warehouse_id = database.create_warehouse("Main", None).unwrap();
+    database
+        .record_inventory_movement(&InventoryMovementDraft {
+            warehouse_id,
+            item_id,
+            cost_layer_id: None,
+            quantity_milliunits: 10_000,
+            increases_stock: true,
+            unit_cost_minor: Some(40_000_000),
+            reference: Some("purchase log".into()),
+        })
+        .unwrap();
+
+    assert!(database.remove_catalog_item(item_id).is_err());
+    let layer_id = database.stock_records("").unwrap()[0].cost_layer_id;
+    database.remove_cost_layer(layer_id).unwrap();
+    database.remove_catalog_item(item_id).unwrap();
+
+    assert!(database.catalog_item(item_id).unwrap().is_none());
+    assert!(database.stock_records("").unwrap().is_empty());
+    assert!(database.movement_records().unwrap().is_empty());
+}
+
+#[test]
+fn history_only_shows_movements_for_inventory_rows_that_still_exist() {
+    let database = Database::open_in_memory().unwrap();
+    let item_id = database
+        .save_catalog_item(&CatalogDraft {
+            id: None,
+            kind: "product".into(),
+            name: "Two batches".into(),
+            sku: Some("TWO-BATCHES".into()),
+            unit: "each".into(),
+            sale_price_minor: 1_000,
+        })
+        .unwrap();
+    let warehouse_id = database.create_warehouse("Main", None).unwrap();
+    for reference in ["first batch", "second batch"] {
+        database
+            .record_inventory_movement(&InventoryMovementDraft {
+                warehouse_id,
+                item_id,
+                cost_layer_id: None,
+                quantity_milliunits: 10_000,
+                increases_stock: true,
+                unit_cost_minor: Some(500),
+                reference: Some(reference.into()),
+            })
+            .unwrap();
+    }
+    let first_layer = database
+        .stock_records("")
+        .unwrap()
+        .into_iter()
+        .min_by_key(|layer| layer.cost_layer_id)
+        .unwrap();
+    database
+        .remove_cost_layer(first_layer.cost_layer_id)
+        .unwrap();
+
+    let history = database.movement_records().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].reference, "second batch");
 }
 
 #[test]
@@ -312,6 +463,7 @@ fn inventory_movements_update_stock_and_reject_negative_balance() {
         .record_inventory_movement(&InventoryMovementDraft {
             warehouse_id,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: 5_000,
             increases_stock: true,
             unit_cost_minor: Some(40_000_000),
@@ -322,6 +474,7 @@ fn inventory_movements_update_stock_and_reject_negative_balance() {
         .record_inventory_movement(&InventoryMovementDraft {
             warehouse_id,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: 2_000,
             increases_stock: false,
             unit_cost_minor: None,
@@ -338,6 +491,7 @@ fn inventory_movements_update_stock_and_reject_negative_balance() {
             .record_inventory_movement(&InventoryMovementDraft {
                 warehouse_id,
                 item_id,
+                cost_layer_id: None,
                 quantity_milliunits: 4_000,
                 increases_stock: false,
                 unit_cost_minor: None,
@@ -345,4 +499,46 @@ fn inventory_movements_update_stock_and_reject_negative_balance() {
             })
             .is_err()
     );
+}
+
+#[test]
+fn fractional_outgoing_stock_preserves_exact_milliunits() {
+    let database = Database::open_in_memory().unwrap();
+    let item_id = database
+        .save_catalog_item(&CatalogDraft {
+            id: None,
+            kind: "product".into(),
+            name: "Ground coffee".into(),
+            sku: Some("COFFEE-FRACTIONAL".into()),
+            unit: "kilogram".into(),
+            sale_price_minor: 60_000_000,
+        })
+        .unwrap();
+    let warehouse_id = database.create_warehouse("Main", None).unwrap();
+    database
+        .record_inventory_movement(&InventoryMovementDraft {
+            warehouse_id,
+            item_id,
+            cost_layer_id: None,
+            quantity_milliunits: 1_500,
+            increases_stock: true,
+            unit_cost_minor: Some(40_000_000),
+            reference: None,
+        })
+        .unwrap();
+    database
+        .record_inventory_movement(&InventoryMovementDraft {
+            warehouse_id,
+            item_id,
+            cost_layer_id: None,
+            quantity_milliunits: 125,
+            increases_stock: false,
+            unit_cost_minor: None,
+            reference: None,
+        })
+        .unwrap();
+
+    let stock = database.stock_records("").unwrap();
+    assert_eq!(stock[0].quantity_milliunits, 1_375);
+    assert_eq!(stock[0].inventory_value_minor, 55_000_000);
 }

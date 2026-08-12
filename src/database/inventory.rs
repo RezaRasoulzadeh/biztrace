@@ -22,6 +22,7 @@ pub struct StockRecord {
     pub sku: String,
     pub unit: String,
     pub quantity_milliunits: i64,
+    pub acquired_quantity_milliunits: i64,
     pub inventory_value_minor: i64,
     pub unit_cost_minor: i64,
 }
@@ -30,6 +31,7 @@ pub struct StockRecord {
 pub struct InventoryMovementDraft {
     pub warehouse_id: i64,
     pub item_id: i64,
+    pub cost_layer_id: Option<i64>,
     pub quantity_milliunits: i64,
     pub increases_stock: bool,
     pub unit_cost_minor: Option<i64>,
@@ -94,6 +96,7 @@ impl Database {
             let draft = InventoryMovementDraft {
                 warehouse_id,
                 item_id,
+                cost_layer_id: None,
                 quantity_milliunits: row.quantity_milliunits,
                 increases_stock: true,
                 unit_cost_minor: Some(row.unit_cost_minor),
@@ -253,13 +256,14 @@ impl Database {
         let pattern = format!("%{}%", search.trim());
         let mut statement = self.connection.prepare(
             "SELECT l.id, l.warehouse_id, w.name, l.item_id, i.name, COALESCE(i.sku, ''), i.unit,
-                    l.remaining_quantity_milliunits,
+                    l.remaining_quantity_milliunits, l.acquired_quantity_milliunits,
                     (l.remaining_quantity_milliunits * l.unit_cost_minor) / 1000,
                     l.unit_cost_minor
              FROM inventory_cost_layers l
              JOIN warehouses w ON w.id = l.warehouse_id
              JOIN catalog_items i ON i.id = l.item_id
              WHERE w.active = 1 AND i.active = 1
+               AND l.archived_at IS NULL
                AND l.remaining_quantity_milliunits > 0
                AND (i.name LIKE ?1 OR COALESCE(i.sku, '') LIKE ?1 OR w.name LIKE ?1)
              ORDER BY i.name COLLATE NOCASE, w.name COLLATE NOCASE, l.acquired_on, l.id",
@@ -275,8 +279,9 @@ impl Database {
                     sku: row.get(5)?,
                     unit: row.get(6)?,
                     quantity_milliunits: row.get(7)?,
-                    inventory_value_minor: row.get(8)?,
-                    unit_cost_minor: row.get(9)?,
+                    acquired_quantity_milliunits: row.get(8)?,
+                    inventory_value_minor: row.get(9)?,
+                    unit_cost_minor: row.get(10)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?)
@@ -313,6 +318,14 @@ impl Database {
                 },
             )?;
         let delta = quantity_milliunits - previous_quantity;
+        let acquired_quantity = if quantity_milliunits == 0 {
+            acquired
+        } else {
+            acquired
+                .checked_sub(previous_quantity)
+                .and_then(|consumed| consumed.checked_add(quantity_milliunits))
+                .ok_or_else(|| DatabaseError::Validation("stock quantity overflow".into()))?
+        };
         let target_active = transaction.query_row(
             "SELECT active FROM warehouses WHERE id = ?1",
             [target_warehouse_id],
@@ -391,7 +404,7 @@ impl Database {
                  warehouse_id = ?4
              WHERE id = ?5",
             params![
-                acquired.max(quantity_milliunits),
+                acquired_quantity,
                 quantity_milliunits,
                 unit_cost_minor,
                 target_warehouse_id,
@@ -431,7 +444,50 @@ impl Database {
             0,
             unit_cost_minor,
             Some("removed from inventory"),
-        )
+        )?;
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "UPDATE inventory_cost_layers
+             SET archived_at = CURRENT_TIMESTAMP
+             WHERE id = ?1",
+            [layer_id],
+        )?;
+        transaction.execute(
+            "UPDATE inventory_movements
+             SET visible_in_history = 0
+             WHERE id = (
+                 SELECT source_movement_id FROM inventory_cost_layers WHERE id = ?1
+             )",
+            [layer_id],
+        )?;
+        transaction.execute(
+            "UPDATE inventory_movements
+             SET visible_in_history = EXISTS(
+                 SELECT 1
+                 FROM inventory_cost_allocations a
+                 JOIN inventory_cost_layers l ON l.id = a.cost_layer_id
+                 WHERE a.movement_id = inventory_movements.id
+                   AND l.archived_at IS NULL
+             )
+             WHERE id IN (
+                 SELECT movement_id FROM inventory_cost_allocations WHERE cost_layer_id = ?1
+             )",
+            [layer_id],
+        )?;
+        transaction.execute(
+            "UPDATE inventory_movements
+             SET visible_in_history = 0
+             WHERE item_id = (SELECT item_id FROM inventory_cost_layers WHERE id = ?1)
+               AND NOT EXISTS(
+                   SELECT 1 FROM inventory_cost_layers l
+                   WHERE l.item_id = inventory_movements.item_id
+                     AND l.archived_at IS NULL
+                     AND l.remaining_quantity_milliunits > 0
+               )",
+            [layer_id],
+        )?;
+        transaction.commit()?;
+        Ok(())
     }
 
     pub fn inventory_products(
@@ -458,6 +514,7 @@ impl Database {
              FROM inventory_movements m
              JOIN catalog_items i ON i.id = m.item_id
              JOIN warehouses w ON w.id = m.warehouse_id
+             WHERE m.visible_in_history = 1
              ORDER BY m.id DESC LIMIT 250",
         )?;
         Ok(statement
@@ -499,6 +556,7 @@ impl Database {
         self.record_inventory_movement(&InventoryMovementDraft {
             warehouse_id,
             item_id,
+            cost_layer_id: None,
             quantity_milliunits: (quantity_milliunits - current).abs(),
             increases_stock: quantity_milliunits > current,
             unit_cost_minor,
@@ -518,6 +576,11 @@ impl Database {
         if draft.increases_stock && draft.unit_cost_minor.is_none() {
             return Err(DatabaseError::Validation(
                 "purchase cost is required for incoming stock".into(),
+            ));
+        }
+        if draft.increases_stock && draft.cost_layer_id.is_some() {
+            return Err(DatabaseError::Validation(
+                "incoming stock cannot target an existing layer".into(),
             ));
         }
         let transaction = self.connection.unchecked_transaction()?;
@@ -587,16 +650,21 @@ impl Database {
                 "SELECT id, remaining_quantity_milliunits, unit_cost_minor
                  FROM inventory_cost_layers
                  WHERE warehouse_id = ?1 AND item_id = ?2 AND remaining_quantity_milliunits > 0
+                   AND archived_at IS NULL
+                   AND (?3 IS NULL OR id = ?3)
                  ORDER BY acquired_on, id",
             )?;
             let layers = statement
-                .query_map(params![draft.warehouse_id, draft.item_id], |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, i64>(2)?,
-                    ))
-                })?
+                .query_map(
+                    params![draft.warehouse_id, draft.item_id, draft.cost_layer_id],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, i64>(2)?,
+                        ))
+                    },
+                )?
                 .collect::<Result<Vec<_>, _>>()?;
             drop(statement);
             for (layer_id, available, unit_cost) in layers {

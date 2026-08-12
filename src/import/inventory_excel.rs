@@ -5,7 +5,7 @@ use std::path::Path;
 use calamine::{Data, Reader, open_workbook_auto};
 use rust_xlsxwriter::Workbook;
 
-use crate::database::InventoryImportRow;
+use crate::database::{InventoryImportRow, StockRecord};
 
 pub struct InventoryImportFile {
     pub rows: Vec<InventoryImportRow>,
@@ -48,6 +48,44 @@ pub fn write_inventory_template(path: &Path) -> Result<(), String> {
                 .write_string((row + 1) as u32, column as u16, *value)
                 .map_err(|error| error.to_string())?;
         }
+    }
+    for (column, width) in [20.0, 24.0, 14.0, 24.0, 24.0].iter().enumerate() {
+        sheet
+            .set_column_width(column as u16, *width)
+            .map_err(|error| error.to_string())?;
+    }
+    workbook.save(path).map_err(|error| error.to_string())
+}
+
+pub fn write_inventory_export(path: &Path, records: &[StockRecord]) -> Result<(), String> {
+    let mut workbook = Workbook::new();
+    let sheet = workbook.add_worksheet();
+    sheet
+        .set_name("ورود موجودی")
+        .map_err(|error| error.to_string())?;
+    sheet.set_right_to_left(true);
+    for (column, header) in HEADERS.iter().enumerate() {
+        sheet
+            .write_string(0, column as u16, *header)
+            .map_err(|error| error.to_string())?;
+    }
+    for (index, record) in records.iter().enumerate() {
+        let row = (index + 1) as u32;
+        sheet
+            .write_string(row, 0, &record.warehouse_name)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_string(row, 1, &record.sku)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_number(row, 2, record.quantity_milliunits as f64 / 1_000.0)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_number(row, 3, record.unit_cost_minor as f64)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_string(row, 4, "خروجی Nexora")
+            .map_err(|error| error.to_string())?;
     }
     for (column, width) in [20.0, 24.0, 14.0, 24.0, 24.0].iter().enumerate() {
         sheet
@@ -116,7 +154,7 @@ fn normalize_digits(value: &str, decimal: bool) -> Option<String> {
             '0'..='9' => Some(character),
             '۰'..='۹' => char::from_digit(character as u32 - '۰' as u32, 10),
             '٠'..='٩' => char::from_digit(character as u32 - '٠' as u32, 10),
-            '.' | '٫' if decimal => Some('.'),
+            '.' | '٫' | '/' if decimal => Some('.'),
             ',' | '٬' | ' ' => None,
             _ => Some('\0'),
         })
@@ -134,9 +172,12 @@ fn parse_decimal(value: &str) -> Option<i64> {
     if fraction.len() > 3 || fraction.contains('.') {
         return None;
     }
+    let whole = if whole.is_empty() {
+        0
+    } else {
+        whole.parse::<i64>().ok()?
+    };
     whole
-        .parse::<i64>()
-        .ok()?
         .checked_mul(1_000)?
         .checked_add(format!("{fraction:0<3}").parse().ok()?)
 }
@@ -157,5 +198,35 @@ mod tests {
         assert_eq!(file.rows.len(), 2);
         assert_eq!(file.rows[0].quantity_milliunits, 100_000);
         assert_eq!(file.rows[0].unit_cost_minor, 40_000_000);
+    }
+
+    #[test]
+    fn inventory_export_can_be_imported_again() {
+        let path = std::env::temp_dir().join(format!(
+            "nexora-inventory-export-{}.xlsx",
+            std::process::id()
+        ));
+        write_inventory_export(
+            &path,
+            &[StockRecord {
+                cost_layer_id: 1,
+                warehouse_id: 1,
+                warehouse_name: "انبار مرکزی".into(),
+                item_id: 1,
+                item_name: "قهوه".into(),
+                sku: "COF-1".into(),
+                unit: "kilogram".into(),
+                quantity_milliunits: 12_500,
+                acquired_quantity_milliunits: 12_500,
+                inventory_value_minor: 500_000_000,
+                unit_cost_minor: 40_000_000,
+            }],
+        )
+        .unwrap();
+        let file = read_inventory_excel(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(file.rows.len(), 1);
+        assert_eq!(file.rows[0].quantity_milliunits, 12_500);
+        assert_eq!(file.rows[0].sku, "COF-1");
     }
 }

@@ -38,6 +38,14 @@ const MIGRATIONS: &[(i64, &str)] = &[
         6,
         include_str!("../../migrations/0006_inventory_revision_warehouses.sql"),
     ),
+    (
+        7,
+        include_str!("../../migrations/0007_inventory_archiving.sql"),
+    ),
+    (
+        8,
+        include_str!("../../migrations/0008_inventory_history_visibility.sql"),
+    ),
 ];
 
 #[derive(Debug)]

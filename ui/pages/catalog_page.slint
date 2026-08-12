@@ -1,6 +1,6 @@
 // ui/pages/catalog_page.slint
 
-import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlTableHeaderCell, RtlText, TipRow } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlText, SelectBox, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 import { CatalogEditor } from "catalog_editor.slint";
 import { CatalogItemData, CatalogItemRow } from "catalog_item_row.slint";
@@ -11,14 +11,24 @@ export component CatalogPage inherits Rectangle {
     in-out property <bool> editor-open;
     in property <string> editor-error;
     in-out property <string> search-text;
+    in-out property <int> sort-index;
+    in property <int> selected-count;
     property <string> pending-remove-id;
     property <string> pending-remove-name;
+    property <bool> all-visible-selected;
     callback search(string);
     callback save(string, string, string, int, int, string);
     callback format-price(string, int) -> FormattedInput;
     callback remove(string);
     callback download-template;
     callback import-excel;
+    callback sort-changed(int);
+    callback selection-changed(string, bool);
+    callback select-all;
+    callback clear-selection;
+    callback export-all;
+    callback export-selected;
+    callback remove-selected;
     background: transparent;
     property <bool> show-tips: root.width >= 1050px;
     property <length> tips-width: 310px;
@@ -48,8 +58,10 @@ export component CatalogPage inherits Rectangle {
 
                 Rectangle { horizontal-stretch: 1; background: transparent; }
 
+                RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 140px; text: "خروجی همه"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-all(); } }
+
                 RtlButton {
-                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    width: root.compact-content ? (root.content-width - 52px) / 4 : 140px;
                     text: "فایل نمونه";
                     icon: @image-url("../../assets/icons/download.svg");
                     primary: false;
@@ -57,7 +69,7 @@ export component CatalogPage inherits Rectangle {
                 }
 
                 RtlButton {
-                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    width: root.compact-content ? (root.content-width - 52px) / 4 : 140px;
                     text: "ورود اکسل";
                     icon: @image-url("../../assets/icons/file-spreadsheet.svg");
                     primary: false;
@@ -65,7 +77,7 @@ export component CatalogPage inherits Rectangle {
                 }
 
                 RtlButton {
-                    width: root.compact-content ? (root.content-width - 44px) / 3 : 150px;
+                    width: root.compact-content ? (root.content-width - 52px) / 4 : 140px;
                     text: "افزودن";
                     icon: @image-url("../../assets/icons/package-plus.svg");
                     clicked => {
@@ -80,18 +92,20 @@ export component CatalogPage inherits Rectangle {
                 }
             }
 
-            RtlLineEdit {
+            HorizontalLayout {
                 height: 40px;
-                text <=> root.search-text;
-                placeholder-text: "جستجو با نام یا کد کالا";
-                edited(value) => { root.search(value); }
+                spacing: 8px;
+                RtlText { width: root.compact-content ? 58px : 72px; text: root.items.length + " مورد"; color: NexoraTheme.text-muted; font-size: 12px; }
+                RtlSelect { width: root.compact-content ? 120px : 190px; model: ["جدیدترین", "نام: الف تا ی", "نام: ی تا الف", "قیمت: کم به زیاد", "قیمت: زیاد به کم"]; current-index <=> root.sort-index; selected(value) => { root.all-visible-selected = false; root.sort-changed(root.sort-index); } }
+                RtlLineEdit { horizontal-stretch: 1; text <=> root.search-text; placeholder-text: "جستجو با نام یا کد کالا"; edited(value) => { root.all-visible-selected = false; root.search(value); } }
             }
 
-            RtlText {
-                height: 28px;
-                text: root.items.length + " مورد";
-                color: NexoraTheme.text-muted;
-                font-size: 12px;
+            if root.selected-count > 0 : HorizontalLayout {
+                height: 38px;
+                spacing: 8px;
+                RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: NexoraTheme.text-muted; }
+                RtlButton { width: root.compact-content ? 115px : 150px; text: "خروجی انتخاب"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-selected(); } }
+                RtlButton { width: root.compact-content ? 110px : 140px; text: "حذف انتخاب"; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { bulk-confirm.open = true; } }
             }
 
             if root.items.length == 0 : EmptyState {
@@ -111,16 +125,10 @@ export component CatalogPage inherits Rectangle {
                 }
             }
 
-            if root.items.length > 0 : HorizontalLayout {
+            if root.items.length > 0 : Rectangle {
                 height: 30px;
-                padding-left: 10px;
-                padding-right: 14px;
-                spacing: 10px;
-
-                RtlTableHeaderCell { width: 78px; text: "عملیات"; }
-                if !root.compact-content : RtlTableHeaderCell { width: 130px; text: "قیمت فروش"; }
-                if !root.compact-content : RtlTableHeaderCell { width: 90px; text: "واحد"; }
-                RtlTableHeaderCell { horizontal-stretch: 1; text: "نام و کد"; }
+                HorizontalLayout { width: parent.width - 72px; height: parent.height; padding-left: 10px; padding-right: 14px; spacing: 10px; RtlTableHeaderCell { width: 78px; text: "عملیات"; } if !root.compact-content : RtlTableHeaderCell { width: 130px; text: "قیمت فروش"; } if !root.compact-content : RtlTableHeaderCell { width: 90px; text: "واحد"; } RtlTableHeaderCell { horizontal-stretch: 1; text: "نام و کد"; } }
+                SelectBox { x: parent.width - self.width - 8px; y: 3px; checked: root.all-visible-selected; toggled(value) => { root.all-visible-selected = value; if value { root.select-all(); } else { root.clear-selection(); } } }
             }
 
             for item in root.items : CatalogItemRow {
@@ -146,6 +154,7 @@ export component CatalogPage inherits Rectangle {
                     root.pending-remove-name = item.name;
                     confirm.open = true;
                 }
+                selection-changed(value) => { if !value { root.all-visible-selected = false; } root.selection-changed(item.id, value); }
             }
         }
     }
@@ -230,4 +239,5 @@ export component CatalogPage inherits Rectangle {
         confirm-text: "حذف";
         confirmed => { root.remove(root.pending-remove-id); }
     }
+    bulk-confirm := ConfirmDialog { width: parent.width; height: parent.height; title: "حذف موارد انتخاب‌شده"; message: root.selected-count + " مورد انتخاب‌شده حذف شوند؟ موارد استفاده‌شده نادیده گرفته می‌شوند."; confirm-text: "حذف انتخاب"; confirmed => { root.remove-selected(); } }
 }

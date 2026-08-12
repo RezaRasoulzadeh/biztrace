@@ -117,8 +117,33 @@ impl Database {
     }
 
     pub fn remove_catalog_item(&self, id: i64) -> Result<(), DatabaseError> {
-        self.connection
-            .execute("DELETE FROM catalog_items WHERE id = ?1", [id])?;
+        let has_stock = self.connection.query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM stock_levels
+                WHERE item_id = ?1 AND quantity_milliunits > 0
+            )",
+            [id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if has_stock {
+            return Err(DatabaseError::Validation(
+                "catalog item still has active inventory".into(),
+            ));
+        }
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "UPDATE catalog_items
+             SET active = 0, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?1 AND active = 1",
+            [id],
+        )?;
+        transaction.execute(
+            "UPDATE inventory_movements
+             SET visible_in_history = 0
+             WHERE item_id = ?1",
+            [id],
+        )?;
+        transaction.commit()?;
         Ok(())
     }
 

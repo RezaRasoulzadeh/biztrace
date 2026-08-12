@@ -5,9 +5,14 @@ use std::path::Path;
 use calamine::{Data, Reader, open_workbook_auto};
 use rust_xlsxwriter::Workbook;
 
-use crate::database::CatalogDraft;
+use crate::database::{CatalogDraft, CatalogRecord};
 
 const HEADERS: [&str; 5] = ["نوع", "نام", "کد کالا", "واحد", "قیمت فروش (ریال)"];
+
+pub struct CatalogImportFile {
+    pub rows: Vec<CatalogDraft>,
+    pub errors: Vec<String>,
+}
 
 pub fn write_catalog_template(path: &Path) -> Result<(), String> {
     let mut workbook = Workbook::new();
@@ -58,7 +63,64 @@ pub fn write_catalog_template(path: &Path) -> Result<(), String> {
     workbook.save(path).map_err(|error| error.to_string())
 }
 
-pub fn read_catalog_excel(path: &Path) -> Result<Vec<CatalogDraft>, String> {
+pub fn write_catalog_export(path: &Path, records: &[CatalogRecord]) -> Result<(), String> {
+    let mut workbook = Workbook::new();
+    let sheet = workbook.add_worksheet();
+    sheet
+        .set_name("خروجی کالاها")
+        .map_err(|error| error.to_string())?;
+    sheet.set_right_to_left(true);
+    for (column, header) in ["نوع", "نام", "کد کالا", "واحد", "قیمت فروش (ریال)"]
+        .iter()
+        .enumerate()
+    {
+        sheet
+            .write_string(0, column as u16, *header)
+            .map_err(|error| error.to_string())?;
+    }
+    for (index, record) in records.iter().enumerate() {
+        let row = (index + 1) as u32;
+        sheet
+            .write_string(
+                row,
+                0,
+                if record.kind == "product" {
+                    "کالا"
+                } else {
+                    "خدمت"
+                },
+            )
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_string(row, 1, &record.name)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_string(row, 2, &record.sku)
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_string(row, 3, unit_label(&record.unit))
+            .map_err(|error| error.to_string())?;
+        sheet
+            .write_number(row, 4, record.sale_price_minor as f64)
+            .map_err(|error| error.to_string())?;
+    }
+    workbook.save(path).map_err(|error| error.to_string())
+}
+
+fn unit_label(value: &str) -> &str {
+    match value {
+        "each" => "عدد",
+        "kilogram" => "کیلوگرم",
+        "gram" => "گرم",
+        "liter" => "لیتر",
+        "meter" => "متر",
+        "hour" => "ساعت",
+        "session" => "جلسه",
+        _ => "سفارشی",
+    }
+}
+
+pub fn read_catalog_excel(path: &Path) -> Result<CatalogImportFile, String> {
     let mut workbook = open_workbook_auto(path).map_err(|error| error.to_string())?;
     let range = workbook
         .worksheet_range_at(0)
@@ -71,8 +133,10 @@ pub fn read_catalog_excel(path: &Path) -> Result<Vec<CatalogDraft>, String> {
             return Err(format!("ستون {} باید «{}» باشد", index + 1, expected));
         }
     }
-    let mut drafts = Vec::new();
-    let mut errors = Vec::new();
+    let mut result = CatalogImportFile {
+        rows: Vec::new(),
+        errors: Vec::new(),
+    };
     for (offset, row) in rows.enumerate() {
         let row_number = offset + 2;
         let values: Vec<String> = (0..5).map(|index| cell_text(row.get(index))).collect();
@@ -81,18 +145,15 @@ pub fn read_catalog_excel(path: &Path) -> Result<Vec<CatalogDraft>, String> {
         }
         match parse_row(&values, row_number) {
             Ok(draft) => {
-                drafts.push(draft);
+                result.rows.push(draft);
             }
-            Err(error) => errors.push(error),
+            Err(error) => result.errors.push(error),
         }
     }
-    if !errors.is_empty() {
-        return Err(errors.into_iter().take(5).collect::<Vec<_>>().join("؛ "));
-    }
-    if drafts.is_empty() {
+    if result.rows.is_empty() && result.errors.is_empty() {
         return Err("هیچ ردیف قابل ورودی در فایل پیدا نشد".into());
     }
-    Ok(drafts)
+    Ok(result)
 }
 
 fn parse_row(values: &[String], row: usize) -> Result<CatalogDraft, String> {
@@ -164,11 +225,34 @@ mod tests {
             std::process::id()
         ));
         write_catalog_template(&path).unwrap();
-        let drafts = read_catalog_excel(&path).unwrap();
+        let file = read_catalog_excel(&path).unwrap();
         std::fs::remove_file(path).unwrap();
 
-        assert_eq!(drafts.len(), 4);
-        assert_eq!(drafts[0].sale_price_minor, 1_200_000);
-        assert_eq!(drafts[3].kind, "service");
+        assert_eq!(file.rows.len(), 4);
+        assert_eq!(file.rows[0].sale_price_minor, 1_200_000);
+        assert_eq!(file.rows[3].kind, "service");
+    }
+
+    #[test]
+    fn catalog_export_can_be_imported_again() {
+        let path =
+            std::env::temp_dir().join(format!("nexora-catalog-export-{}.xlsx", std::process::id()));
+        write_catalog_export(
+            &path,
+            &[CatalogRecord {
+                id: 1,
+                kind: "product".into(),
+                name: "قهوه".into(),
+                sku: "COF-1".into(),
+                unit: "kilogram".into(),
+                sale_price_minor: 50_000_000,
+            }],
+        )
+        .unwrap();
+        let file = read_catalog_excel(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert_eq!(file.rows.len(), 1);
+        assert_eq!(file.rows[0].sku.as_deref(), Some("COF-1"));
+        assert_eq!(file.rows[0].unit, "kilogram");
     }
 }

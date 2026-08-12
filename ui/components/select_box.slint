@@ -1,0 +1,18 @@
+// ui/components/select_box.slint
+
+import { NexoraIcon } from "nexora_icon.slint";
+import { NexoraTheme } from "theme.slint";
+
+export component SelectBox inherits Rectangle {
+    in property <bool> checked;
+    callback toggled(bool);
+    width: 20px;
+    height: 20px;
+    background: root.checked ? NexoraTheme.brand : touch.has-hover ? NexoraTheme.control-hover : NexoraTheme.control;
+    border-color: root.checked ? NexoraTheme.brand : NexoraTheme.border;
+    border-width: 1px;
+    border-radius: 5px;
+    animate background { duration: 100ms; }
+    if root.checked : NexoraIcon { x: 3px; y: 3px; width: 14px; height: 14px; source: @image-url("../../assets/icons/check.svg"); tint: white; }
+    touch := TouchArea { clicked => { root.toggled(!root.checked); } }
+}

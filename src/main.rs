@@ -1,5 +1,7 @@
 // src/main.rs
 
+use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use nexora::database::{
@@ -7,12 +9,20 @@ use nexora::database::{
     StockRecord, WarehouseRecord,
 };
 use nexora::import::{
-    read_catalog_excel, read_inventory_excel, write_catalog_template, write_inventory_template,
+    read_catalog_excel, read_inventory_excel, write_catalog_export, write_catalog_template,
+    write_inventory_export, write_inventory_template,
 };
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
 use slint::{ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
+
+thread_local! {
+    static CATALOG_SELECTION: RefCell<HashSet<i64>> = RefCell::new(HashSet::new());
+    static INVENTORY_SELECTION: RefCell<HashSet<i64>> = RefCell::new(HashSet::new());
+    static CATALOG_SORT: Cell<i32> = const { Cell::new(0) };
+    static INVENTORY_SORT: Cell<i32> = const { Cell::new(0) };
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database = Rc::new(Database::open_default()?);
@@ -36,6 +46,106 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let (Some(app), Ok(records)) = (weak.upgrade(), search_database.catalog_items(&search)) {
             app.set_catalog_items(catalog_model(records));
         }
+    });
+
+    let weak = app.as_weak();
+    let sort_database = Rc::clone(&database);
+    app.on_catalog_sort_changed(move |index| {
+        CATALOG_SORT.with(|sort| sort.set(index));
+        if let Some(app) = weak.upgrade()
+            && let Ok(records) = sort_database.catalog_items(&app.get_catalog_search_text())
+        {
+            app.set_catalog_items(catalog_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let selection_database = Rc::clone(&database);
+    app.on_catalog_selection_changed(move |id, selected| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            CATALOG_SELECTION.with(|selection| {
+                if selected {
+                    selection.borrow_mut().insert(id);
+                } else {
+                    selection.borrow_mut().remove(&id);
+                }
+                app.set_catalog_selected_count(selection.borrow().len() as i32);
+            });
+        }
+        if let Ok(records) = selection_database.catalog_items(&app.get_catalog_search_text()) {
+            app.set_catalog_items(catalog_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let select_all_database = Rc::clone(&database);
+    app.on_catalog_select_all(move || {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(records) = select_all_database.catalog_items(&app.get_catalog_search_text()) {
+            CATALOG_SELECTION.with(|selection| {
+                selection
+                    .borrow_mut()
+                    .extend(records.iter().map(|item| item.id));
+                app.set_catalog_selected_count(selection.borrow().len() as i32);
+            });
+            app.set_catalog_items(catalog_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let clear_database = Rc::clone(&database);
+    app.on_catalog_clear_selection(move || {
+        let Some(app) = weak.upgrade() else { return };
+        CATALOG_SELECTION.with(|selection| selection.borrow_mut().clear());
+        app.set_catalog_selected_count(0);
+        if let Ok(records) = clear_database.catalog_items(&app.get_catalog_search_text()) {
+            app.set_catalog_items(catalog_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let export_database = Rc::clone(&database);
+    app.on_catalog_export_all(move || {
+        if let Some(app) = weak.upgrade() {
+            export_catalog(&app, &export_database, false);
+        }
+    });
+    let weak = app.as_weak();
+    let export_database = Rc::clone(&database);
+    app.on_catalog_export_selected(move || {
+        if let Some(app) = weak.upgrade() {
+            export_catalog(&app, &export_database, true);
+        }
+    });
+
+    let weak = app.as_weak();
+    let bulk_remove_database = Rc::clone(&database);
+    app.on_catalog_remove_selected(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let ids = CATALOG_SELECTION
+            .with(|selection| selection.borrow().iter().copied().collect::<Vec<_>>());
+        let mut removed = 0;
+        let mut skipped = 0;
+        for id in ids {
+            if bulk_remove_database.remove_catalog_item(id).is_ok() {
+                removed += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+        CATALOG_SELECTION.with(|selection| selection.borrow_mut().clear());
+        app.set_catalog_selected_count(0);
+        if let Ok(records) = bulk_remove_database.catalog_items(&app.get_catalog_search_text()) {
+            app.set_catalog_items(catalog_model(records));
+        }
+        if let Ok(records) = bulk_remove_database.catalog_items("") {
+            app.set_catalog_count(records.len() as i32);
+        }
+        app.set_status_message(
+            format!("{removed} مورد حذف شد؛ {skipped} مورد استفاده‌شده نادیده گرفته شد").into(),
+        );
+        app.set_notification_open(true);
     });
 
     let weak = app.as_weak();
@@ -90,6 +200,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let Some(app) = weak.upgrade() else { return };
         let Some(id) = id.parse().ok() else { return };
         if remove_database.remove_catalog_item(id).is_ok() {
+            CATALOG_SELECTION.with(|selection| {
+                selection.borrow_mut().remove(&id);
+                app.set_catalog_selected_count(selection.borrow().len() as i32);
+            });
             let search = app.get_catalog_search_text();
             if let Ok(records) = remove_database.catalog_items(&search) {
                 app.set_catalog_items(catalog_model(records));
@@ -109,59 +223,71 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let weak = app.as_weak();
     app.on_catalog_download_template(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let Some(mut path) = FileDialog::new()
-            .set_title("ذخیره فایل نمونه کالاها و خدمات")
-            .set_file_name("nexora-catalog-template.xlsx")
-            .add_filter("Excel", &["xlsx"])
-            .save_file()
-        else {
-            return;
-        };
-        if path.extension().is_none() {
-            path.set_extension("xlsx");
-        }
-        match write_catalog_template(&path) {
-            Ok(()) => app.set_status_message("فایل نمونه اکسل ذخیره شد".into()),
-            Err(error) => app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into()),
-        }
-        app.set_notification_open(true);
+        let weak = weak.clone();
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("ذخیره فایل نمونه کالاها و خدمات")
+                .set_file_name("nexora-catalog-template.xlsx")
+                .add_filter("Excel", &["xlsx"])
+                .save_file()
+                .await
+            else {
+                return;
+            };
+            let path = xlsx_path(file.path());
+            let Some(app) = weak.upgrade() else { return };
+            match safe_excel_write(|| write_catalog_template(&path)) {
+                Ok(()) => app.set_status_message("فایل نمونه اکسل ذخیره شد".into()),
+                Err(error) => {
+                    app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into())
+                }
+            }
+            app.set_notification_open(true);
+        });
     });
 
     let weak = app.as_weak();
     let import_database = Rc::clone(&database);
     app.on_catalog_import_excel(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let Some(path) = FileDialog::new()
-            .set_title("انتخاب فایل کالاها و خدمات")
-            .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
-            .pick_file()
-        else {
-            return;
-        };
-        let result = read_catalog_excel(&path).and_then(|drafts| {
-            import_database
-                .import_catalog_items(&drafts)
-                .map_err(|error| error.to_string())
-        });
-        match result {
-            Ok(result) => {
-                if let Ok(records) = import_database.catalog_items("") {
-                    app.set_catalog_count(records.len() as i32);
-                    app.set_catalog_items(catalog_model(records));
+        let weak = weak.clone();
+        let import_database = Rc::clone(&import_database);
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("انتخاب فایل کالاها و خدمات")
+                .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
+                .pick_file()
+                .await
+            else {
+                return;
+            };
+            let result = read_catalog_excel(file.path()).and_then(|file| {
+                import_database
+                    .import_catalog_items(&file.rows)
+                    .map(|result| (result, file.errors.len()))
+                    .map_err(|error| error.to_string())
+            });
+            let Some(app) = weak.upgrade() else { return };
+            match result {
+                Ok((result, invalid)) => {
+                    if let Ok(records) = import_database.catalog_items("") {
+                        app.set_catalog_count(records.len() as i32);
+                        app.set_catalog_items(catalog_model(records));
+                    }
+                    app.set_catalog_search_text("".into());
+                    app.set_status_message(
+                        format!(
+                            "{} مورد وارد شد؛ {} تکراری و {} نامعتبر نادیده گرفته شد",
+                            result.inserted, result.duplicates, invalid
+                        )
+                        .into(),
+                    );
                 }
-                app.set_catalog_search_text("".into());
-                app.set_status_message(
-                    format!(
-                        "{} مورد وارد شد؛ {} مورد تکراری نادیده گرفته شد",
-                        result.inserted, result.duplicates
-                    )
-                    .into(),
-                );
+                Err(error) => {
+                    app.set_status_message(format!("ورود اکسل انجام نشد: {error}").into())
+                }
             }
-            Err(error) => app.set_status_message(format!("ورود اکسل انجام نشد: {error}").into()),
-        }
-        app.set_notification_open(true);
+            app.set_notification_open(true);
+        });
     });
 
     let weak = app.as_weak();
@@ -174,6 +300,114 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             app.set_inventory_items(stock_model(records, &warehouses));
         }
+    });
+
+    let weak = app.as_weak();
+    let inventory_sort_database = Rc::clone(&database);
+    app.on_inventory_sort_changed(move |index| {
+        INVENTORY_SORT.with(|sort| sort.set(index));
+        if let Some(app) = weak.upgrade()
+            && let (Ok(records), Ok(warehouses)) = (
+                inventory_sort_database.stock_records(&app.get_inventory_search_text()),
+                inventory_sort_database.warehouses(),
+            )
+        {
+            app.set_inventory_items(stock_model(records, &warehouses));
+        }
+    });
+
+    let weak = app.as_weak();
+    let inventory_selection_database = Rc::clone(&database);
+    app.on_inventory_selection_changed(move |id, selected| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            INVENTORY_SELECTION.with(|selection| {
+                if selected {
+                    selection.borrow_mut().insert(id);
+                } else {
+                    selection.borrow_mut().remove(&id);
+                }
+                app.set_inventory_selected_count(selection.borrow().len() as i32);
+            });
+        }
+        if let (Ok(records), Ok(warehouses)) = (
+            inventory_selection_database.stock_records(&app.get_inventory_search_text()),
+            inventory_selection_database.warehouses(),
+        ) {
+            app.set_inventory_items(stock_model(records, &warehouses));
+        }
+    });
+
+    let weak = app.as_weak();
+    let inventory_select_all_database = Rc::clone(&database);
+    app.on_inventory_select_all(move || {
+        let Some(app) = weak.upgrade() else { return };
+        if let (Ok(records), Ok(warehouses)) = (
+            inventory_select_all_database.stock_records(&app.get_inventory_search_text()),
+            inventory_select_all_database.warehouses(),
+        ) {
+            INVENTORY_SELECTION.with(|selection| {
+                selection
+                    .borrow_mut()
+                    .extend(records.iter().map(|item| item.cost_layer_id));
+                app.set_inventory_selected_count(selection.borrow().len() as i32);
+            });
+            app.set_inventory_items(stock_model(records, &warehouses));
+        }
+    });
+
+    let weak = app.as_weak();
+    let inventory_clear_database = Rc::clone(&database);
+    app.on_inventory_clear_selection(move || {
+        let Some(app) = weak.upgrade() else { return };
+        INVENTORY_SELECTION.with(|selection| selection.borrow_mut().clear());
+        app.set_inventory_selected_count(0);
+        if let (Ok(records), Ok(warehouses)) = (
+            inventory_clear_database.stock_records(&app.get_inventory_search_text()),
+            inventory_clear_database.warehouses(),
+        ) {
+            app.set_inventory_items(stock_model(records, &warehouses));
+        }
+    });
+
+    let weak = app.as_weak();
+    let inventory_export_database = Rc::clone(&database);
+    app.on_inventory_export_all(move || {
+        if let Some(app) = weak.upgrade() {
+            export_inventory(&app, &inventory_export_database, false);
+        }
+    });
+    let weak = app.as_weak();
+    let inventory_export_database = Rc::clone(&database);
+    app.on_inventory_export_selected(move || {
+        if let Some(app) = weak.upgrade() {
+            export_inventory(&app, &inventory_export_database, true);
+        }
+    });
+
+    let weak = app.as_weak();
+    let inventory_bulk_remove_database = Rc::clone(&database);
+    app.on_inventory_remove_selected(move || {
+        let Some(app) = weak.upgrade() else { return };
+        let ids = INVENTORY_SELECTION
+            .with(|selection| selection.borrow().iter().copied().collect::<Vec<_>>());
+        let mut removed = 0;
+        let mut skipped = 0;
+        for id in ids {
+            if inventory_bulk_remove_database.remove_cost_layer(id).is_ok() {
+                removed += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+        INVENTORY_SELECTION.with(|selection| selection.borrow_mut().clear());
+        app.set_inventory_selected_count(0);
+        let search = app.get_inventory_search_text();
+        let _ = refresh_inventory(&app, &inventory_bulk_remove_database, &search);
+        app.set_status_message(
+            format!("{removed} ردیف موجودی حذف شد؛ {skipped} ردیف نادیده گرفته شد").into(),
+        );
+        app.set_notification_open(true);
     });
 
     let weak = app.as_weak();
@@ -296,7 +530,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weak = app.as_weak();
     let movement_database = Rc::clone(&database);
     app.on_record_inventory_movement(
-        move |warehouse_index, product_id, direction_index, quantity, unit_cost, reference| {
+        move |warehouse_index,
+              product_id,
+              layer_id,
+              direction_index,
+              quantity,
+              unit_cost,
+              reference| {
             let Some(app) = weak.upgrade() else { return };
             app.set_inventory_editor_error("".into());
             let Ok(warehouses) = movement_database.warehouses() else {
@@ -314,6 +554,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 app.set_inventory_editor_error("مقدار واردشده معتبر نیست".into());
                 return;
             };
+            let cost_layer_id = if layer_id.is_empty() {
+                None
+            } else {
+                let Some(layer_id) = layer_id.parse().ok() else {
+                    app.set_inventory_editor_error("ردیف موجودی معتبر نیست".into());
+                    return;
+                };
+                Some(layer_id)
+            };
             let unit_cost_minor = if direction_index == 0 {
                 let Some(value) = parse_amount(&unit_cost) else {
                     app.set_inventory_editor_error("قیمت خرید هر واحد را وارد کنید".into());
@@ -326,6 +575,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let draft = InventoryMovementDraft {
                 warehouse_id: warehouse.id,
                 item_id: product_id,
+                cost_layer_id,
                 quantity_milliunits: quantity,
                 increases_stock: direction_index == 0,
                 unit_cost_minor,
@@ -402,6 +652,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         match remove_stock_database.remove_cost_layer(layer_id) {
             Ok(()) => {
+                INVENTORY_SELECTION.with(|selection| {
+                    selection.borrow_mut().remove(&layer_id);
+                    app.set_inventory_selected_count(selection.borrow().len() as i32);
+                });
                 let search = app.get_inventory_search_text();
                 if refresh_inventory(&app, &remove_stock_database, &search).is_ok() {
                     app.set_status_message("ردیف موجودی حذف شد".into());
@@ -417,63 +671,171 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let weak = app.as_weak();
     app.on_inventory_download_template(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let Some(mut path) = FileDialog::new()
-            .set_title("ذخیره فایل نمونه موجودی")
-            .set_file_name("nexora-inventory-template.xlsx")
-            .add_filter("Excel", &["xlsx"])
-            .save_file()
-        else {
-            return;
-        };
-        if path.extension().is_none() {
-            path.set_extension("xlsx");
-        }
-        match write_inventory_template(&path) {
-            Ok(()) => app.set_status_message("فایل نمونه موجودی ذخیره شد".into()),
-            Err(error) => app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into()),
-        }
-        app.set_notification_open(true);
+        let weak = weak.clone();
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("ذخیره فایل نمونه موجودی")
+                .set_file_name("nexora-inventory-template.xlsx")
+                .add_filter("Excel", &["xlsx"])
+                .save_file()
+                .await
+            else {
+                return;
+            };
+            let path = xlsx_path(file.path());
+            let Some(app) = weak.upgrade() else { return };
+            match safe_excel_write(|| write_inventory_template(&path)) {
+                Ok(()) => app.set_status_message("فایل نمونه موجودی ذخیره شد".into()),
+                Err(error) => {
+                    app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into())
+                }
+            }
+            app.set_notification_open(true);
+        });
     });
 
     let weak = app.as_weak();
     let inventory_import_database = Rc::clone(&database);
     app.on_inventory_import_excel(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let Some(path) = FileDialog::new()
-            .set_title("انتخاب فایل ورود موجودی")
-            .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
-            .pick_file()
-        else {
-            return;
-        };
-        match read_inventory_excel(&path) {
-            Ok(file) => match inventory_import_database.import_inventory_rows(&file.rows) {
-                Ok(result) => {
-                    let search = app.get_inventory_search_text();
-                    let _ = refresh_inventory(&app, &inventory_import_database, &search);
-                    app.set_status_message(
-                        format!(
-                            "{} ردیف وارد شد؛ {} ردیف نادیده گرفته شد",
-                            result.inserted,
-                            result.skipped + file.errors.len()
-                        )
-                        .into(),
-                    );
-                }
+        let weak = weak.clone();
+        let inventory_import_database = Rc::clone(&inventory_import_database);
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("انتخاب فایل ورود موجودی")
+                .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
+                .pick_file()
+                .await
+            else {
+                return;
+            };
+            let result = read_inventory_excel(file.path());
+            let Some(app) = weak.upgrade() else { return };
+            match result {
+                Ok(file) => match inventory_import_database.import_inventory_rows(&file.rows) {
+                    Ok(result) => {
+                        let search = app.get_inventory_search_text();
+                        let _ = refresh_inventory(&app, &inventory_import_database, &search);
+                        app.set_status_message(
+                            format!(
+                                "{} ردیف وارد شد؛ {} ردیف نادیده گرفته شد",
+                                result.inserted,
+                                result.skipped + file.errors.len()
+                            )
+                            .into(),
+                        );
+                    }
+                    Err(error) => {
+                        app.set_status_message(format!("ورود موجودی انجام نشد: {error}").into())
+                    }
+                },
                 Err(error) => {
-                    app.set_status_message(format!("ورود موجودی انجام نشد: {error}").into())
+                    app.set_status_message(format!("خواندن فایل انجام نشد: {error}").into())
                 }
-            },
-            Err(error) => app.set_status_message(format!("خواندن فایل انجام نشد: {error}").into()),
-        }
-        app.set_notification_open(true);
+            }
+            app.set_notification_open(true);
+        });
     });
 
     Ok(app.run()?)
 }
 
-fn catalog_model(records: Vec<CatalogRecord>) -> ModelRc<CatalogItemData> {
+fn export_catalog(app: &AppWindow, database: &Database, selected_only: bool) {
+    let Ok(mut records) = database.catalog_items("") else {
+        return;
+    };
+    if selected_only {
+        CATALOG_SELECTION
+            .with(|selection| records.retain(|item| selection.borrow().contains(&item.id)));
+        if records.is_empty() {
+            app.set_status_message("موردی برای خروجی انتخاب نشده است".into());
+            app.set_notification_open(true);
+            return;
+        }
+    }
+    let weak = app.as_weak();
+    let _ = slint::spawn_local(async move {
+        let Some(file) = AsyncFileDialog::new()
+            .set_title("ذخیره خروجی کالاها")
+            .set_file_name("nexora-catalog-export.xlsx")
+            .add_filter("Excel", &["xlsx"])
+            .save_file()
+            .await
+        else {
+            return;
+        };
+        let path = xlsx_path(file.path());
+        let Some(app) = weak.upgrade() else { return };
+        match safe_excel_write(|| write_catalog_export(&path, &records)) {
+            Ok(()) => {
+                app.set_status_message(format!("خروجی {} مورد ذخیره شد", records.len()).into())
+            }
+            Err(error) => app.set_status_message(format!("خروجی ذخیره نشد: {error}").into()),
+        }
+        app.set_notification_open(true);
+    });
+}
+
+fn export_inventory(app: &AppWindow, database: &Database, selected_only: bool) {
+    let Ok(mut records) = database.stock_records("") else {
+        return;
+    };
+    if selected_only {
+        INVENTORY_SELECTION.with(|selection| {
+            records.retain(|item| selection.borrow().contains(&item.cost_layer_id))
+        });
+        if records.is_empty() {
+            app.set_status_message("ردیفی برای خروجی انتخاب نشده است".into());
+            app.set_notification_open(true);
+            return;
+        }
+    }
+    let weak = app.as_weak();
+    let _ = slint::spawn_local(async move {
+        let Some(file) = AsyncFileDialog::new()
+            .set_title("ذخیره خروجی موجودی")
+            .set_file_name("nexora-inventory-export.xlsx")
+            .add_filter("Excel", &["xlsx"])
+            .save_file()
+            .await
+        else {
+            return;
+        };
+        let path = xlsx_path(file.path());
+        let Some(app) = weak.upgrade() else { return };
+        match safe_excel_write(|| write_inventory_export(&path, &records)) {
+            Ok(()) => {
+                app.set_status_message(format!("خروجی {} ردیف ذخیره شد", records.len()).into())
+            }
+            Err(error) => app.set_status_message(format!("خروجی ذخیره نشد: {error}").into()),
+        }
+        app.set_notification_open(true);
+    });
+}
+
+fn xlsx_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut path = path.to_path_buf();
+    if !path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx"))
+    {
+        path.set_extension("xlsx");
+    }
+    path
+}
+
+fn safe_excel_write(operation: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation))
+        .map_err(|_| "ساخت فایل اکسل با خطای داخلی متوقف شد".to_owned())?
+}
+
+fn catalog_model(mut records: Vec<CatalogRecord>) -> ModelRc<CatalogItemData> {
+    CATALOG_SORT.with(|sort| match sort.get() {
+        1 => records.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        2 => records.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase())),
+        3 => records.sort_by_key(|item| item.sale_price_minor),
+        4 => records.sort_by_key(|item| std::cmp::Reverse(item.sale_price_minor)),
+        _ => {}
+    });
     let rows: Vec<CatalogItemData> = records
         .into_iter()
         .map(|record| CatalogItemData {
@@ -491,6 +853,7 @@ fn catalog_model(records: Vec<CatalogRecord>) -> ModelRc<CatalogItemData> {
             unit_label: unit_label(&record.unit).into(),
             price_label: format_amount(record.sale_price_minor),
             price_value: format_number(record.sale_price_minor).into(),
+            selected: CATALOG_SELECTION.with(|selected| selected.borrow().contains(&record.id)),
         })
         .collect();
     ModelRc::new(VecModel::from(rows))
@@ -626,9 +989,17 @@ fn refresh_inventory(
 }
 
 fn stock_model(
-    records: Vec<StockRecord>,
+    mut records: Vec<StockRecord>,
     warehouses: &[WarehouseRecord],
 ) -> ModelRc<StockItemData> {
+    INVENTORY_SORT.with(|sort| match sort.get() {
+        1 => records.sort_by(|a, b| a.item_name.to_lowercase().cmp(&b.item_name.to_lowercase())),
+        2 => records.sort_by_key(|item| item.quantity_milliunits),
+        3 => records.sort_by_key(|item| std::cmp::Reverse(item.quantity_milliunits)),
+        4 => records.sort_by_key(|item| item.unit_cost_minor),
+        5 => records.sort_by_key(|item| std::cmp::Reverse(item.unit_cost_minor)),
+        _ => records.sort_by_key(|item| std::cmp::Reverse(item.cost_layer_id)),
+    });
     let rows: Vec<StockItemData> = records
         .into_iter()
         .map(|record| StockItemData {
@@ -644,10 +1015,19 @@ fn stock_model(
                 .unwrap_or_default() as i32,
             unit_label: unit_label(&record.unit).into(),
             quantity_label: format_quantity(record.quantity_milliunits).into(),
+            received_quantity_label: format_quantity(record.acquired_quantity_milliunits).into(),
+            remaining_progress: if record.acquired_quantity_milliunits == 0 {
+                0.0
+            } else {
+                (record.quantity_milliunits as f32 / record.acquired_quantity_milliunits as f32)
+                    .clamp(0.0, 1.0)
+            },
             quantity_value: format_quantity(record.quantity_milliunits).into(),
             inventory_value_label: format_amount(record.inventory_value_minor),
             unit_cost_label: format_amount(record.unit_cost_minor),
             unit_cost_value: format_number(record.unit_cost_minor).into(),
+            selected: INVENTORY_SELECTION
+                .with(|selected| selected.borrow().contains(&record.cost_layer_id)),
         })
         .collect();
     ModelRc::new(VecModel::from(rows))
@@ -733,7 +1113,7 @@ fn parse_quantity_value(value: &str) -> Option<i64> {
             '0'..='9' | '.' => Some(character),
             '۰'..='۹' => char::from_digit(character as u32 - '۰' as u32, 10),
             '٠'..='٩' => char::from_digit(character as u32 - '٠' as u32, 10),
-            '٫' => Some('.'),
+            '٫' | '/' => Some('.'),
             ',' | '٬' | ' ' => None,
             _ => Some('\0'),
         })
@@ -745,7 +1125,11 @@ fn parse_quantity_value(value: &str) -> Option<i64> {
     if fraction.len() > 3 || fraction.contains('.') {
         return None;
     }
-    let whole = whole.parse::<i64>().ok()?;
+    let whole = if whole.is_empty() {
+        0
+    } else {
+        whole.parse::<i64>().ok()?
+    };
     let fraction = format!("{fraction:0<3}").parse::<i64>().ok()?;
     whole.checked_mul(1_000)?.checked_add(fraction)
 }
@@ -783,6 +1167,8 @@ mod tests {
     #[test]
     fn quantity_parser_supports_fractional_persian_input() {
         assert_eq!(parse_quantity("۱۲٫۵"), Some(12_500));
+        assert_eq!(parse_quantity("۱/۵"), Some(1_500));
+        assert_eq!(parse_quantity(".125"), Some(125));
         assert_eq!(format_quantity(12_500), "12.5");
     }
 }

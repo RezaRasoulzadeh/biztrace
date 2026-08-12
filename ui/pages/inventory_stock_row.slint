@@ -1,6 +1,6 @@
 // ui/pages/inventory_stock_row.slint
 
-import { IconButton, NexoraTheme, RtlText } from "../components/mod.slint";
+import { IconButton, NexoraTheme, RtlText, SelectBox } from "../components/mod.slint";
 
 export struct StockItemData {
     cost-layer-id: string,
@@ -12,10 +12,13 @@ export struct StockItemData {
     warehouse-index: int,
     unit-label: string,
     quantity-label: string,
+    received-quantity-label: string,
+    remaining-progress: float,
     quantity-value: string,
     inventory-value-label: string,
     unit-cost-label: string,
     unit-cost-value: string,
+    selected: bool,
 }
 
 export component InventoryStockRow inherits Rectangle {
@@ -23,36 +26,77 @@ export component InventoryStockRow inherits Rectangle {
     in property <bool> narrow;
     in property <bool> show-details;
     in property <bool> show-warehouse;
+    in property <bool> show-pricing;
     callback edit;
+    callback outgoing;
     callback remove;
-    height: 62px;
-    background: hover.has-hover ? NexoraTheme.surface-raised : NexoraTheme.surface;
-    border-color: NexoraTheme.border;
-    border-width: 1px;
-    border-radius: 8px;
-    animate background { duration: 120ms; }
+    callback selection-changed(bool);
+    height: 76px;
+    background: transparent;
+    card := Rectangle {
+        width: root.width - 72px;
+        height: parent.height;
+        clip: true;
+        background: hover.has-hover ? NexoraTheme.surface-raised : NexoraTheme.surface;
+        border-color: NexoraTheme.border;
+        border-width: 1px;
+        border-radius: 8px;
+        animate background { duration: 120ms; }
+        hover := TouchArea { mouse-cursor: pointer; }
+        HorizontalLayout {
+            height: 50px;
+            padding-left: 14px;
+            padding-right: 14px;
+            spacing: 12px;
+            cross-axis-alignment: center;
 
-    hover := TouchArea { mouse-cursor: pointer; }
-
-    HorizontalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
-        spacing: 12px;
-        cross-axis-alignment: center;
-
-        IconButton { icon: @image-url("../../assets/icons/trash-2.svg"); label: "حذف از موجودی"; danger: true; clicked => { root.remove(); } }
-        IconButton { icon: @image-url("../../assets/icons/pencil.svg"); label: "ویرایش مقدار و بهای خرید"; clicked => { root.edit(); } }
-        RtlText { width: 100px; text: root.item.quantity-label; font-weight: 600; wrap: no-wrap; }
-        if !root.narrow : RtlText { width: 140px; text: root.item.unit-cost-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
-        if root.show-details : RtlText { width: 140px; text: root.item.inventory-value-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
-        if !root.narrow : RtlText { width: 90px; text: root.item.unit-label; color: NexoraTheme.text-muted; wrap: no-wrap; }
-        if root.show-warehouse : RtlText { width: root.show-details ? 150px : 120px; text: root.item.warehouse-name; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
-        VerticalLayout {
-            horizontal-stretch: 1;
-            min-width: 190px;
-            spacing: 1px;
-            RtlText { text: root.item.item-name; font-weight: 600; wrap: no-wrap; overflow: elide; }
-            RtlText { text: root.item.sku; color: NexoraTheme.text-faint; font-size: 12px; wrap: no-wrap; overflow: elide; }
+            IconButton { icon: @image-url("../../assets/icons/trash-2.svg"); label: "حذف از موجودی"; danger: true; clicked => { root.remove(); } }
+            IconButton { icon: @image-url("../../assets/icons/pencil.svg"); label: "ویرایش مقدار و بهای خرید"; clicked => { root.edit(); } }
+            IconButton { icon: @image-url("../../assets/icons/package-minus.svg"); label: "ثبت خروج کالا"; clicked => { root.outgoing(); } }
+            if root.show-pricing : RtlText { width: 140px; text: root.item.unit-cost-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+            if root.show-details : RtlText { width: 140px; text: root.item.inventory-value-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+            if root.show-pricing : RtlText { width: 90px; text: root.item.unit-label; color: NexoraTheme.text-muted; wrap: no-wrap; }
+            if root.show-warehouse : RtlText { width: root.show-details ? 150px : 120px; text: root.item.warehouse-name; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                min-width: 190px;
+                spacing: 1px;
+                RtlText { text: root.item.item-name; font-weight: 600; wrap: no-wrap; overflow: elide; }
+                RtlText { text: root.item.sku; color: NexoraTheme.text-faint; font-size: 12px; wrap: no-wrap; overflow: elide; }
+            }
+        }
+        HorizontalLayout {
+            x: 152px;
+            y: 53px;
+            width: parent.width - 166px;
+            height: 15px;
+            spacing: 10px;
+            cross-axis-alignment: center;
+            RtlText {
+                width: 72px;
+                text: root.item.quantity-label + "/" + root.item.received-quantity-label;
+                horizontal-alignment: left;
+                color: root.item.remaining-progress <= 0.2 ? NexoraTheme.danger : root.item.remaining-progress <= 0.5 ? NexoraTheme.warning : NexoraTheme.success;
+                font-size: 11px;
+                font-weight: 600;
+                wrap: no-wrap;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 6px;
+                background: NexoraTheme.control;
+                border-radius: 3px;
+                Rectangle {
+                    x: parent.width - self.width;
+                    width: parent.width * max(0.0, min(1.0, root.item.remaining-progress));
+                    height: parent.height;
+                    background: root.item.remaining-progress <= 0.2 ? NexoraTheme.danger : root.item.remaining-progress <= 0.5 ? NexoraTheme.warning : NexoraTheme.success;
+                    border-radius: 3px;
+                    animate width { duration: 260ms; easing: ease-out; }
+                    animate x { duration: 260ms; easing: ease-out; }
+                }
+            }
         }
     }
+    SelectBox { x: root.width - self.width - 8px; y: (parent.height - self.height) / 2; checked: root.item.selected; toggled(value) => { root.selection-changed(value); } }
 }

@@ -37,6 +37,8 @@ export component AppWindow inherits Window {
     in-out property <string> status-message;
     in property <[CatalogItemData]> catalog-items;
     in-out property <string> catalog-search-text;
+    in-out property <int> catalog-sort-index;
+    in property <int> catalog-selected-count;
     in-out property <bool> catalog-editor-open;
     in-out property <string> catalog-editor-error;
     in-out property <bool> notification-open;
@@ -46,6 +48,13 @@ export component AppWindow inherits Window {
     callback catalog-remove(string);
     callback catalog-download-template;
     callback catalog-import-excel;
+    callback catalog-sort-changed(int);
+    callback catalog-selection-changed(string, bool);
+    callback catalog-select-all;
+    callback catalog-clear-selection;
+    callback catalog-export-all;
+    callback catalog-export-selected;
+    callback catalog-remove-selected;
     in property <[StockItemData]> inventory-items;
     in property <[MovementItemData]> inventory-movements;
     in property <[WarehouseItemData]> inventory-warehouse-items;
@@ -54,6 +63,8 @@ export component AppWindow inherits Window {
     in property <[string]> inventory-warehouse-alternative-ids;
     in property <[SearchOption]> inventory-product-options;
     in-out property <string> inventory-search-text;
+    in-out property <int> inventory-sort-index;
+    in property <int> inventory-selected-count;
     in-out property <bool> warehouse-editor-open;
     in-out property <bool> movement-editor-open;
     in-out property <bool> stock-editor-open;
@@ -62,7 +73,7 @@ export component AppWindow inherits Window {
     callback inventory-search(string);
     callback inventory-product-search(string);
     callback save-warehouse(string, string, string);
-    callback record-inventory-movement(int, string, int, string, string, string);
+    callback record-inventory-movement(int, string, string, int, string, string, string);
     callback set-stock-level(string, int, string, string, string);
     callback remove-stock-layer(string);
     callback inventory-download-template;
@@ -70,6 +81,13 @@ export component AppWindow inherits Window {
     callback remove-warehouse(string);
     callback prepare-warehouse-removal(string);
     callback force-remove-warehouse(string, string);
+    callback inventory-sort-changed(int);
+    callback inventory-selection-changed(string, bool);
+    callback inventory-select-all;
+    callback inventory-clear-selection;
+    callback inventory-export-all;
+    callback inventory-export-selected;
+    callback inventory-remove-selected;
     property <bool> compact-navigation: !root.navigation-expanded || root.width < 620px;
     property <length> workspace-width: root.width - sidebar.width;
     property <bool> narrow-content: root.workspace-width < 640px;
@@ -116,6 +134,8 @@ export component AppWindow inherits Window {
         narrow: root.narrow-content;
         items: root.catalog-items;
         search-text <=> root.catalog-search-text;
+        sort-index <=> root.catalog-sort-index;
+        selected-count: root.catalog-selected-count;
         editor-open <=> root.catalog-editor-open;
         editor-error: root.catalog-editor-error;
         search(value) => { root.catalog-search(value); }
@@ -124,6 +144,13 @@ export component AppWindow inherits Window {
         remove(id) => { root.catalog-remove(id); }
         download-template => { root.catalog-download-template(); }
         import-excel => { root.catalog-import-excel(); }
+        sort-changed(index) => { root.catalog-sort-changed(index); }
+        selection-changed(id, selected) => { root.catalog-selection-changed(id, selected); }
+        select-all => { root.catalog-select-all(); }
+        clear-selection => { root.catalog-clear-selection(); }
+        export-all => { root.catalog-export-all(); }
+        export-selected => { root.catalog-export-selected(); }
+        remove-selected => { root.catalog-remove-selected(); }
     }
 
     if root.navigation-index == 3 : CustomersPage {
@@ -153,6 +180,8 @@ export component AppWindow inherits Window {
         warehouse-alternative-ids: root.inventory-warehouse-alternative-ids;
         product-options: root.inventory-product-options;
         search-text <=> root.inventory-search-text;
+        sort-index <=> root.inventory-sort-index;
+        selected-count: root.inventory-selected-count;
         warehouse-editor-open <=> root.warehouse-editor-open;
         movement-editor-open <=> root.movement-editor-open;
         stock-editor-open <=> root.stock-editor-open;
@@ -162,8 +191,8 @@ export component AppWindow inherits Window {
         search(value) => { root.inventory-search(value); }
         search-product(value) => { root.inventory-product-search(value); }
         save-warehouse(id, name, address) => { root.save-warehouse(id, name, address); }
-        record-movement(warehouse, product, direction, quantity, cost, reference) => {
-            root.record-inventory-movement(warehouse, product, direction, quantity, cost, reference);
+        record-movement(warehouse, product, layer, direction, quantity, cost, reference) => {
+            root.record-inventory-movement(warehouse, product, layer, direction, quantity, cost, reference);
         }
         set-stock(layer, warehouse, quantity, cost, reference) => { root.set-stock-level(layer, warehouse, quantity, cost, reference); }
         remove-stock(layer) => { root.remove-stock-layer(layer); }
@@ -172,6 +201,13 @@ export component AppWindow inherits Window {
         remove-warehouse(id) => { root.remove-warehouse(id); }
         prepare-warehouse-removal(id) => { root.prepare-warehouse-removal(id); }
         force-remove-warehouse(id, alternate) => { root.force-remove-warehouse(id, alternate); }
+        sort-changed(index) => { root.inventory-sort-changed(index); }
+        selection-changed(id, selected) => { root.inventory-selection-changed(id, selected); }
+        select-all => { root.inventory-select-all(); }
+        clear-selection => { root.inventory-clear-selection(); }
+        export-all => { root.inventory-export-all(); }
+        export-selected => { root.inventory-export-selected(); }
+        remove-selected => { root.inventory-remove-selected(); }
     }
 
     if root.navigation-index == 5 : FundsPage {

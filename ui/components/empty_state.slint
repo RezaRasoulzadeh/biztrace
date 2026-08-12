@@ -49,12 +49,18 @@ export component EmptyState inherits RtlCard {
             horizontal-alignment: center;
         }
 
-        if !root.action-text.is-empty : RtlButton {
-            width: 180px;
+        if !root.action-text.is-empty : Rectangle {
             height: 38px;
-            text: root.action-text;
-            icon: root.action-icon;
-            clicked => { root.action(); }
+            background: transparent;
+
+            RtlButton {
+                x: (parent.width - self.width) / 2;
+                width: 180px;
+                height: parent.height;
+                text: root.action-text;
+                icon: root.action-icon;
+                clicked => { root.action(); }
+            }
         }
     }
 }
