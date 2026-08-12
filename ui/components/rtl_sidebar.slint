@@ -1,7 +1,7 @@
 // ui/components/rtl_sidebar.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export struct SidebarItemData {
@@ -16,7 +16,7 @@ export component RtlSidebar inherits Rectangle {
     callback selected(int);
     callback toggled;
     width: root.compact ? 72px : 218px;
-    background: NexoraTheme.surface;
+    background: BizTraceTheme.surface;
     animate width { duration: 220ms; easing: ease-in-out; }
 
     VerticalLayout {
@@ -27,18 +27,18 @@ export component RtlSidebar inherits Rectangle {
 
         Rectangle {
             height: 38px;
-            background: toggle-touch.has-hover ? NexoraTheme.control-hover : transparent;
+            background: toggle-touch.has-hover ? BizTraceTheme.control-hover : transparent;
             border-radius: 7px;
             accessible-role: button;
             accessible-label: root.compact ? "باز کردن نوار کناری" : "بستن نوار کناری";
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: root.compact ? (parent.width - self.width) / 2 : 10px;
                 y: (parent.height - self.height) / 2;
                 width: 18px;
                 height: 18px;
                 source: root.compact ? @image-url("../../assets/icons/panel-left-open.svg") : @image-url("../../assets/icons/panel-right-close.svg");
-                tint: NexoraTheme.text-muted;
+                tint: BizTraceTheme.text-muted;
                 animate x { duration: 220ms; easing: ease-in-out; }
             }
 
@@ -46,7 +46,7 @@ export component RtlSidebar inherits Rectangle {
                 x: 48px;
                 width: parent.width - 58px;
                 height: parent.height;
-                color: NexoraTheme.text-faint;
+                color: BizTraceTheme.text-faint;
                 font-size: 12px;
                 wrap: no-wrap;
                 overflow: elide;
@@ -57,7 +57,7 @@ export component RtlSidebar inherits Rectangle {
 
         for item[index] in root.items : Rectangle {
             height: 44px;
-            background: index == root.current-index ? NexoraTheme.brand : item-touch.has-hover ? NexoraTheme.control-hover : transparent;
+            background: index == root.current-index ? BizTraceTheme.brand : item-touch.has-hover ? BizTraceTheme.control-hover : transparent;
             border-radius: 7px;
             accessible-role: button;
             accessible-label: item.label;
@@ -70,7 +70,7 @@ export component RtlSidebar inherits Rectangle {
                 if !root.compact : RtlText {
                     horizontal-stretch: 1;
                     text: item.label;
-                    color: index == root.current-index ? white : NexoraTheme.text-muted;
+                    color: index == root.current-index ? white : BizTraceTheme.text-muted;
                     font-weight: index == root.current-index ? 600 : 400;
                     wrap: no-wrap;
                     overflow: elide;
@@ -80,13 +80,13 @@ export component RtlSidebar inherits Rectangle {
                     width: 24px;
                     background: transparent;
 
-                    NexoraIcon {
+                    BizTraceIcon {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
                         width: 19px;
                         height: 19px;
                         source: item.icon;
-                        tint: index == root.current-index ? white : NexoraTheme.text-muted;
+                        tint: index == root.current-index ? white : BizTraceTheme.text-muted;
                     }
                 }
             }
@@ -107,7 +107,7 @@ export component RtlSidebar inherits Rectangle {
         RtlText {
             height: 34px;
             text: root.compact ? "v0.1" : "نسخه آزمایشی ۰٫۱";
-            color: NexoraTheme.text-faint;
+            color: BizTraceTheme.text-faint;
             font-size: 11px;
             horizontal-alignment: center;
             wrap: no-wrap;

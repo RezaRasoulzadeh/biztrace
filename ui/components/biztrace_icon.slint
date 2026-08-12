@@ -1,0 +1,12 @@
+// ui/components/biztrace_icon.slint
+
+import { BizTraceTheme } from "theme.slint";
+
+export component BizTraceIcon inherits Image {
+    in property <color> tint: BizTraceTheme.text-muted;
+    width: 20px;
+    height: 20px;
+    image-fit: contain;
+    colorize: root.tint;
+    accessible-role: none;
+}

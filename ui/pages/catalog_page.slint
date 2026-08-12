@@ -1,6 +1,6 @@
 // ui/pages/catalog_page.slint
 
-import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlText, SelectBox, TipRow } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, BizTraceIcon, BizTraceTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlText, SelectBox, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 import { CatalogEditor } from "catalog_editor.slint";
 import { CatalogItemData, CatalogItemRow } from "catalog_item_row.slint";
@@ -49,7 +49,7 @@ export component CatalogPage inherits Rectangle {
 
             RtlText {
                 text: "مدیریت اقلام قابل فروش و قیمت‌گذاری";
-                color: NexoraTheme.text-muted;
+                color: BizTraceTheme.text-muted;
             }
 
             HorizontalLayout {
@@ -95,7 +95,7 @@ export component CatalogPage inherits Rectangle {
             HorizontalLayout {
                 height: 40px;
                 spacing: 8px;
-                RtlText { width: root.compact-content ? 58px : 72px; text: root.items.length + " مورد"; color: NexoraTheme.text-muted; font-size: 12px; }
+                RtlText { width: root.compact-content ? 58px : 72px; text: root.items.length + " مورد"; color: BizTraceTheme.text-muted; font-size: 12px; }
                 RtlSelect { width: root.compact-content ? 120px : 190px; model: ["جدیدترین", "نام: الف تا ی", "نام: ی تا الف", "قیمت: کم به زیاد", "قیمت: زیاد به کم"]; current-index <=> root.sort-index; selected(value) => { root.all-visible-selected = false; root.sort-changed(root.sort-index); } }
                 RtlLineEdit { horizontal-stretch: 1; text <=> root.search-text; placeholder-text: "جستجو با نام یا کد کالا"; edited(value) => { root.all-visible-selected = false; root.search(value); } }
             }
@@ -103,7 +103,7 @@ export component CatalogPage inherits Rectangle {
             if root.selected-count > 0 : HorizontalLayout {
                 height: 38px;
                 spacing: 8px;
-                RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: NexoraTheme.text-muted; }
+                RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: BizTraceTheme.text-muted; }
                 RtlButton { width: root.compact-content ? 115px : 150px; text: "خروجی انتخاب"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-selected(); } }
                 RtlButton { width: root.compact-content ? 110px : 140px; text: "حذف انتخاب"; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { bulk-confirm.open = true; } }
             }
@@ -164,7 +164,7 @@ export component CatalogPage inherits Rectangle {
         y: 0;
         width: root.tips-width;
         height: parent.height;
-        background: NexoraTheme.surface;
+        background: BizTraceTheme.surface;
         opacity: root.show-tips ? 1 : 0;
         visible: root.opacity > 0;
         animate opacity { duration: 180ms; }
@@ -175,7 +175,7 @@ export component CatalogPage inherits Rectangle {
             y: 0;
             width: 3px;
             height: parent.height;
-            background: NexoraTheme.brand;
+            background: BizTraceTheme.brand;
         }
 
         VerticalLayout {
@@ -194,10 +194,10 @@ export component CatalogPage inherits Rectangle {
                 Rectangle {
                     width: 42px;
                     height: 42px;
-                    background: NexoraTheme.brand;
+                    background: BizTraceTheme.brand;
                     border-radius: 21px;
 
-                    NexoraIcon {
+                    BizTraceIcon {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
                         width: 21px;
@@ -211,10 +211,10 @@ export component CatalogPage inherits Rectangle {
             RtlText {
                 height: 38px;
                 text: "صدها کالا و خدمت را در چند مرحله ساده ثبت کنید.";
-                color: NexoraTheme.text-muted;
+                color: BizTraceTheme.text-muted;
                 font-size: 12px;
             }
-            TipRow { icon: @image-url("../../assets/icons/download.svg"); text: "فایل نمونه Nexora را دریافت کنید."; }
+            TipRow { icon: @image-url("../../assets/icons/download.svg"); text: "فایل نمونه BizTrace را دریافت کنید."; }
             TipRow { icon: @image-url("../../assets/icons/sheet.svg"); text: "ردیف‌ها را تکمیل کنید؛ عنوان ستون‌ها ثابت بماند."; }
             TipRow { icon: @image-url("../../assets/icons/badge-check.svg"); text: "کد کالا کمک می‌کند موارد تکراری تشخیص داده شوند."; }
             TipRow { icon: @image-url("../../assets/icons/upload.svg"); text: "فایل را وارد کنید؛ تکراری‌ها رد و بقیه ذخیره می‌شوند."; }

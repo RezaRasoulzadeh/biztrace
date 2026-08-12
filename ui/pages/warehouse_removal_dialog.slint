@@ -1,6 +1,6 @@
 // ui/pages/warehouse_removal_dialog.slint
 
-import { IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText } from "../components/mod.slint";
+import { IconButton, BizTraceTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText } from "../components/mod.slint";
 
 export component WarehouseRemovalDialog inherits Rectangle {
     in-out property <bool> open;
@@ -31,8 +31,8 @@ export component WarehouseRemovalDialog inherits Rectangle {
                 IconButton { icon: @image-url("../../assets/icons/x.svg"); label: "بستن"; clicked => { root.open = false; } }
                 RtlHeading { horizontal-stretch: 1; text: "حذف انبار «" + root.warehouse-name + "»"; font-size: 19px; }
             }
-            if !root.has-stock : RtlText { text: "این انبار موجودی فعالی ندارد و می‌توان آن را حذف کرد. سوابق قبلی حفظ می‌شوند."; color: NexoraTheme.text-muted; }
-            if root.has-stock : RtlText { height: 52px; text: "این انبار دارای کالا است. ابتدا می‌توانید موجودی آن را دستی مدیریت کنید، یا همه ردیف‌ها را به یک انبار جایگزین انتقال دهید."; color: NexoraTheme.text-muted; }
+            if !root.has-stock : RtlText { text: "این انبار موجودی فعالی ندارد و می‌توان آن را حذف کرد. سوابق قبلی حفظ می‌شوند."; color: BizTraceTheme.text-muted; }
+            if root.has-stock : RtlText { height: 52px; text: "این انبار دارای کالا است. ابتدا می‌توانید موجودی آن را دستی مدیریت کنید، یا همه ردیف‌ها را به یک انبار جایگزین انتقال دهید."; color: BizTraceTheme.text-muted; }
             if root.has-stock && root.alternative-names.length > 0 : RtlSelectField { label: "انبار جایگزین:"; model: root.alternative-names; current-index <=> root.alternate-index; }
             if root.has-stock && root.alternative-names.length == 0 : RtlText { height: 44px; text: "برای انتقال اجباری، ابتدا یک انبار دیگر ایجاد کنید."; color: #ff9aaa; }
             if !root.error-message.is-empty : RtlText { height: 30px; text: root.error-message; color: #ff9aaa; font-size: 12px; }

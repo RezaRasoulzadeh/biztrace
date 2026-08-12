@@ -1,6 +1,6 @@
 // ui/pages/inventory_movement_editor.slint
 
-import { FormattedInput, IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField, SearchOption, SearchPicker } from "../components/mod.slint";
+import { FormattedInput, IconButton, BizTraceTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField, SearchOption, SearchPicker } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component InventoryMovementEditor inherits Rectangle {
@@ -51,9 +51,9 @@ export component InventoryMovementEditor inherits Rectangle {
                         padding-right: 22px;
                         spacing: 13px;
                         if !root.outgoing : RtlSelectField { label: "انبار:"; model: root.warehouses; current-index <=> root.warehouse-index; }
-                        if root.outgoing : RtlText { height: 40px; text: "انبار: " + root.warehouses[root.warehouse-index]; color: NexoraTheme.text-muted; }
+                        if root.outgoing : RtlText { height: 40px; text: "انبار: " + root.warehouses[root.warehouse-index]; color: BizTraceTheme.text-muted; }
                         RtlText { height: 24px; text: "کالا:"; font-weight: 600; }
-                        if root.outgoing : RtlText { height: 40px; text: root.selected-product-name; color: NexoraTheme.text; font-weight: 600; }
+                        if root.outgoing : RtlText { height: 40px; text: root.selected-product-name; color: BizTraceTheme.text; font-weight: 600; }
                         if !root.outgoing : SearchPicker { options: root.product-options; query <=> root.product-query; selected-id <=> root.selected-product-id; selected-label <=> root.selected-product-name; placeholder-text: "نام یا کد کالا را جستجو کنید"; search(value) => { root.search-product(value); } }
                         RtlTextField { label: "مقدار:"; text <=> root.quantity; placeholder-text: "مثلاً ۱۲ یا ۱.۲"; }
                         if !root.outgoing : RtlTextField { label: "قیمت خرید هر واحد:"; text <=> root.unit-cost; placeholder-text: "ریال"; numeric-mode: true; format-numeric(value, cursor) => { return root.format-price(value, cursor); } }

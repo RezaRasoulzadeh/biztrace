@@ -1,6 +1,6 @@
 // ui/pages/settings_page.slint
 
-import { NexoraTheme, RtlCard, RtlHeading, RtlText } from "../components/mod.slint";
+import { BizTraceTheme, RtlCard, RtlHeading, RtlText } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component SettingsPage inherits Rectangle {
@@ -14,14 +14,14 @@ export component SettingsPage inherits Rectangle {
             padding: root.narrow ? 14px : 28px;
             spacing: 18px;
             RtlHeading { text: "تنظیمات"; }
-            RtlText { text: "پیکربندی عمومی برنامه و کسب‌وکار"; color: NexoraTheme.text-muted; }
+            RtlText { text: "پیکربندی عمومی برنامه و کسب‌وکار"; color: BizTraceTheme.text-muted; }
             RtlCard {
                 height: 132px;
                 VerticalLayout {
                     padding: 20px;
                     spacing: 6px;
                     RtlText { text: "پایگاه داده"; font-size: 17px; font-weight: 600; }
-                    RtlText { text: "ساختار پایگاه داده آماده است و مهاجرت‌ها هنگام اجرای برنامه مدیریت می‌شوند."; color: NexoraTheme.text-muted; }
+                    RtlText { text: "ساختار پایگاه داده آماده است و مهاجرت‌ها هنگام اجرای برنامه مدیریت می‌شوند."; color: BizTraceTheme.text-muted; }
                 }
             }
         }

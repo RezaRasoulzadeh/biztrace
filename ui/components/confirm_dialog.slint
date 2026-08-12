@@ -1,6 +1,6 @@
 // ui/components/confirm_dialog.slint
 
-import { NexoraTheme } from "theme.slint";
+import { BizTraceTheme } from "theme.slint";
 import { RtlButton } from "rtl_button.slint";
 import { RtlCard } from "rtl_card.slint";
 import { RtlHeading } from "rtl_heading.slint";
@@ -37,7 +37,7 @@ export component ConfirmDialog inherits Rectangle {
             padding: 22px;
             spacing: 10px;
             RtlHeading { text: root.title; font-size: 19px; }
-            RtlText { text: root.message; color: NexoraTheme.text-muted; }
+            RtlText { text: root.message; color: BizTraceTheme.text-muted; }
             Rectangle { vertical-stretch: 1; background: transparent; }
             HorizontalLayout {
                 height: 40px;

@@ -1,6 +1,6 @@
 // ui/pages/inventory_page.slint
 
-import { ConfirmDialog, EmptyState, FormattedInput, NexoraIcon, NexoraTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlTabs, RtlText, SearchOption, SelectBox, TipRow } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, BizTraceIcon, BizTraceTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlTabs, RtlText, SearchOption, SelectBox, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 import { InventoryMovementEditor } from "inventory_movement_editor.slint";
 import { InventoryMovementRow, MovementItemData } from "inventory_movement_row.slint";
@@ -85,7 +85,7 @@ export component InventoryPage inherits Rectangle {
             spacing: 14px;
             alignment: start;
             RtlHeading { text: "موجودی و انبار"; }
-            RtlText { text: "کنترل موجودی، مشاهده گردش‌ها و مدیریت محل‌های نگهداری"; color: NexoraTheme.text-muted; }
+            RtlText { text: "کنترل موجودی، مشاهده گردش‌ها و مدیریت محل‌های نگهداری"; color: BizTraceTheme.text-muted; }
             RtlTabs { tabs: ["گردش موجودی", "موجودی فعلی", "انبارها"]; current-index <=> root.current-tab; }
             if root.current-tab == 1 : HorizontalLayout {
                 height: 40px;
@@ -96,8 +96,8 @@ export component InventoryPage inherits Rectangle {
                 RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 135px; text: "ورود اکسل"; icon: @image-url("../../assets/icons/file-spreadsheet.svg"); primary: false; clicked => { root.import-excel(); } }
                 RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 165px; text: "ثبت ورود"; icon: @image-url("../../assets/icons/package-plus.svg"); clicked => { movement-editor.outgoing = false; movement-editor.direction-index = 0; movement-editor.cost-layer-id = ""; movement-editor.selected-product-id = ""; movement-editor.selected-product-name = ""; movement-editor.product-query = ""; movement-editor.quantity = ""; movement-editor.unit-cost = ""; movement-editor.reference = ""; root.movement-editor-open = true; root.search-product(""); } }
             }
-            if root.current-tab == 1 && (root.items.length > 0 || !root.search-text.is-empty) : HorizontalLayout { height: 40px; spacing: 8px; RtlText { width: root.compact-content ? 58px : 88px; text: root.items.length + " رکورد"; color: NexoraTheme.text-muted; font-size: 12px; } RtlSelect { width: root.compact-content ? 120px : 200px; model: ["جدیدترین خرید", "نام کالا", "موجودی: کم به زیاد", "موجودی: زیاد به کم", "بهای خرید: کم به زیاد", "بهای خرید: زیاد به کم"]; current-index <=> root.sort-index; selected(value) => { root.all-visible-selected = false; root.sort-changed(root.sort-index); } } RtlLineEdit { horizontal-stretch: 1; text <=> root.search-text; placeholder-text: "جستجو با نام کالا، کد یا انبار"; edited(value) => { root.all-visible-selected = false; root.search(value); } } }
-            if root.current-tab == 1 && root.selected-count > 0 : HorizontalLayout { height: 38px; spacing: 8px; RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: NexoraTheme.text-muted; } RtlButton { width: root.compact-content ? 115px : 150px; text: "خروجی انتخاب"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-selected(); } } RtlButton { width: root.compact-content ? 110px : 140px; text: "حذف انتخاب"; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { inventory-bulk-confirm.open = true; } } }
+            if root.current-tab == 1 && (root.items.length > 0 || !root.search-text.is-empty) : HorizontalLayout { height: 40px; spacing: 8px; RtlText { width: root.compact-content ? 58px : 88px; text: root.items.length + " رکورد"; color: BizTraceTheme.text-muted; font-size: 12px; } RtlSelect { width: root.compact-content ? 120px : 200px; model: ["جدیدترین خرید", "نام کالا", "موجودی: کم به زیاد", "موجودی: زیاد به کم", "بهای خرید: کم به زیاد", "بهای خرید: زیاد به کم"]; current-index <=> root.sort-index; selected(value) => { root.all-visible-selected = false; root.sort-changed(root.sort-index); } } RtlLineEdit { horizontal-stretch: 1; text <=> root.search-text; placeholder-text: "جستجو با نام کالا، کد یا انبار"; edited(value) => { root.all-visible-selected = false; root.search(value); } } }
+            if root.current-tab == 1 && root.selected-count > 0 : HorizontalLayout { height: 38px; spacing: 8px; RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: BizTraceTheme.text-muted; } RtlButton { width: root.compact-content ? 115px : 150px; text: "خروجی انتخاب"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-selected(); } } RtlButton { width: root.compact-content ? 110px : 140px; text: "حذف انتخاب"; icon: @image-url("../../assets/icons/trash-2.svg"); clicked => { inventory-bulk-confirm.open = true; } } }
             if root.current-tab == 1 && root.items.length == 0 && !root.search-text.is-empty : EmptyState {
                 icon: @image-url("../../assets/icons/search-x.svg");
                 title: "نتیجه‌ای پیدا نشد";
@@ -176,7 +176,7 @@ export component InventoryPage inherits Rectangle {
                     selection-changed(value) => { if !value { root.all-visible-selected = false; } root.selection-changed(item.cost-layer-id, value); }
                 }
             }
-            if root.current-tab == 0 : RtlText { height: 28px; text: "آخرین " + root.movements.length + " گردش ثبت‌شده"; color: NexoraTheme.text-muted; font-size: 12px; }
+            if root.current-tab == 0 : RtlText { height: 28px; text: "آخرین " + root.movements.length + " گردش ثبت‌شده"; color: BizTraceTheme.text-muted; font-size: 12px; }
             if root.current-tab == 0 && root.movements.length == 0 : EmptyState { icon: @image-url("../../assets/icons/scroll-text.svg"); title: "گردشی ثبت نشده"; description: "ورود، خروج و بهای تمام‌شده کالاها در این بخش دیده می‌شود."; action-text: ""; action-icon: @image-url("../../assets/icons/scroll-text.svg"); }
             if root.current-tab == 0 && root.movements.length > 0 : HorizontalLayout {
                 height: 30px;
@@ -195,7 +195,7 @@ export component InventoryPage inherits Rectangle {
                 Rectangle { horizontal-stretch: 1; background: transparent; }
                 RtlButton { width: 160px; text: "انبار جدید"; icon: @image-url("../../assets/icons/warehouse.svg"); clicked => { root.edit-warehouse-id = ""; root.edit-warehouse-name = ""; root.edit-warehouse-address = ""; root.warehouse-editor-open = true; } }
             }
-            if root.current-tab == 2 : RtlText { height: 28px; text: root.warehouse-items.length + " انبار فعال"; color: NexoraTheme.text-muted; font-size: 12px; }
+            if root.current-tab == 2 : RtlText { height: 28px; text: root.warehouse-items.length + " انبار فعال"; color: BizTraceTheme.text-muted; font-size: 12px; }
             if root.current-tab == 2 && root.warehouse-items.length == 0 : EmptyState { icon: @image-url("../../assets/icons/warehouse.svg"); title: "هنوز انباری ندارید"; description: "برای شروع مدیریت موجودی، محل نگهداری را بسازید."; action-text: "ایجاد انبار"; action-icon: @image-url("../../assets/icons/warehouse.svg"); action => { root.edit-warehouse-id = ""; root.edit-warehouse-name = ""; root.edit-warehouse-address = ""; root.warehouse-editor-open = true; } }
             if root.current-tab == 2 : VerticalLayout { spacing: 8px; for warehouse in root.warehouse-items : WarehouseRow { item: warehouse; edit => { root.edit-warehouse-id = warehouse.id; root.edit-warehouse-name = warehouse.name; root.edit-warehouse-address = warehouse.address; root.warehouse-editor-open = true; } remove => { root.pending-remove-warehouse-id = warehouse.id; root.pending-remove-warehouse-name = warehouse.name; root.pending-remove-warehouse-has-stock = warehouse.has-stock; root.warehouse-alternate-index = 0; root.prepare-warehouse-removal(warehouse.id); root.warehouse-removal-open = true; } } }
         }
@@ -205,17 +205,17 @@ export component InventoryPage inherits Rectangle {
         x: root.show-tips ? 0px : -root.tips-width;
         width: root.tips-width;
         height: parent.height;
-        background: NexoraTheme.surface;
+        background: BizTraceTheme.surface;
         opacity: root.show-tips ? 1 : 0;
         visible: root.opacity > 0;
         animate opacity { duration: 180ms; }
         animate x { duration: 220ms; easing: ease-out; }
-        Rectangle { x: parent.width - 3px; width: 3px; height: parent.height; background: NexoraTheme.brand; }
+        Rectangle { x: parent.width - 3px; width: 3px; height: parent.height; background: BizTraceTheme.brand; }
         VerticalLayout {
             padding: 24px;
             spacing: 8px;
-            HorizontalLayout { height: 46px; cross-axis-alignment: center; Rectangle { horizontal-stretch: 1; background: transparent; } RtlHeading { text: "موجودی قابل اعتماد"; font-size: 18px; } Rectangle { width: 32px; background: transparent; NexoraIcon { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 22px; height: 22px; source: @image-url("../../assets/icons/warehouse.svg"); tint: NexoraTheme.brand-soft; } } }
-            RtlText { height: 44px; text: "هر خرید یک ردیف مستقل با مقدار و بهای خرید خودش می‌سازد."; color: NexoraTheme.text-muted; font-size: 12px; }
+            HorizontalLayout { height: 46px; cross-axis-alignment: center; Rectangle { horizontal-stretch: 1; background: transparent; } RtlHeading { text: "موجودی قابل اعتماد"; font-size: 18px; } Rectangle { width: 32px; background: transparent; BizTraceIcon { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 22px; height: 22px; source: @image-url("../../assets/icons/warehouse.svg"); tint: BizTraceTheme.brand-soft; } } }
+            RtlText { height: 44px; text: "هر خرید یک ردیف مستقل با مقدار و بهای خرید خودش می‌سازد."; color: BizTraceTheme.text-muted; font-size: 12px; }
             TipRow { icon: @image-url("../../assets/icons/search.svg"); text: "کالا را با نام یا کد جستجو کنید؛ نام کالا همیشه در اولویت نمایش است."; }
             TipRow { icon: @image-url("../../assets/icons/file-spreadsheet.svg"); text: "برای ورود تعداد زیاد، فایل نمونه را پر کرده و با اکسل وارد کنید."; }
             TipRow { icon: @image-url("../../assets/icons/pencil.svg"); text: "مقدار و بهای خرید هر ردیف را مستقل ویرایش کنید."; }

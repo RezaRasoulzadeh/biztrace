@@ -1,6 +1,6 @@
 // ui/pages/dashboard_page.slint
 
-import { MetricCard, NexoraTheme, RtlCard, RtlHeading, RtlText } from "../components/mod.slint";
+import { MetricCard, BizTraceTheme, RtlCard, RtlHeading, RtlText } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component DashboardPage inherits Rectangle {
@@ -22,7 +22,7 @@ export component DashboardPage inherits Rectangle {
             RtlHeading { text: "داشبورد"; }
             RtlText {
                 text: "نمای کلی فعالیت‌های کسب‌وکار";
-                color: NexoraTheme.text-muted;
+                color: BizTraceTheme.text-muted;
             }
 
             if root.narrow : VerticalLayout {
@@ -47,10 +47,10 @@ export component DashboardPage inherits Rectangle {
                 VerticalLayout {
                     padding: 22px;
                     spacing: 8px;
-                    RtlHeading { text: "شروع کار با Nexora"; font-size: 18px; }
+                    RtlHeading { text: "شروع کار با BizTrace"; font-size: 18px; }
                     RtlText {
                         text: "ابتدا کالاها یا خدمات، مشتریان و حساب‌های مالی را ثبت کنید. سپس می‌توانید فاکتور صادر کنید و گردش موجودی و وجوه را پیگیری کنید.";
-                        color: NexoraTheme.text-muted;
+                        color: BizTraceTheme.text-muted;
                     }
                 }
             }

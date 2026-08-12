@@ -1,6 +1,6 @@
 // ui/pages/stock_level_editor.slint
 
-import { FormattedInput, IconButton, NexoraTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField } from "../components/mod.slint";
+import { FormattedInput, IconButton, BizTraceTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component StockLevelEditor inherits Rectangle {
@@ -43,7 +43,7 @@ export component StockLevelEditor inherits Rectangle {
                         padding-right: 22px;
                         spacing: 13px;
                         RtlText { height: 28px; text: root.item-name + "  •  " + root.warehouse-name; font-weight: 600; }
-                        RtlText { height: 26px; text: "مقدار فعلی این ردیف: " + root.current-quantity; color: NexoraTheme.text-muted; }
+                        RtlText { height: 26px; text: "مقدار فعلی این ردیف: " + root.current-quantity; color: BizTraceTheme.text-muted; }
                         RtlSelectField { label: "انبار:"; model: root.warehouses; current-index <=> root.warehouse-index; }
                         RtlTextField { label: "مقدار جدید:"; text <=> root.new-quantity; placeholder-text: "مقدار نهایی این ردیف"; }
                         RtlTextField { label: "بهای خرید هر واحد:"; text <=> root.unit-cost; placeholder-text: "ریال"; numeric-mode: true; format-numeric(value, cursor) => { return root.format-price(value, cursor); } }

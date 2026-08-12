@@ -84,7 +84,7 @@ pub fn write_inventory_export(path: &Path, records: &[StockRecord]) -> Result<()
             .write_number(row, 3, record.unit_cost_minor as f64)
             .map_err(|error| error.to_string())?;
         sheet
-            .write_string(row, 4, "خروجی Nexora")
+            .write_string(row, 4, "خروجی BizTrace")
             .map_err(|error| error.to_string())?;
     }
     for (column, width) in [20.0, 24.0, 14.0, 24.0, 24.0].iter().enumerate() {
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn generated_inventory_template_can_be_read() {
         let path = std::env::temp_dir().join(format!(
-            "nexora-inventory-template-{}.xlsx",
+            "biztrace-inventory-template-{}.xlsx",
             std::process::id()
         ));
         write_inventory_template(&path).unwrap();
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn inventory_export_can_be_imported_again() {
         let path = std::env::temp_dir().join(format!(
-            "nexora-inventory-export-{}.xlsx",
+            "biztrace-inventory-export-{}.xlsx",
             std::process::id()
         ));
         write_inventory_export(

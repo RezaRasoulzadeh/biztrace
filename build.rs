@@ -8,7 +8,7 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let font_dir = manifest_dir.join("assets/fonts");
     let app = manifest_dir.join("ui/app.slint");
-    let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("nexora-ui.slint");
+    let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("biztrace-ui.slint");
     let font_files = [
         "Vazirmatn-Regular.ttf",
         "Vazirmatn-Medium.ttf",
@@ -16,7 +16,7 @@ fn main() {
         "Vazirmatn-Bold.ttf",
     ];
 
-    let mut source = String::from("// nexora-ui.slint\n\n");
+    let mut source = String::from("// biztrace-ui.slint\n\n");
     for file in font_files {
         let path = font_dir.join(file);
         println!("cargo:rerun-if-changed={}", path.display());

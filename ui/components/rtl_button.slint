@@ -1,7 +1,7 @@
 // ui/components/rtl_button.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export component RtlButton inherits Rectangle {
@@ -10,8 +10,8 @@ export component RtlButton inherits Rectangle {
     in property <bool> primary: true;
     callback clicked;
     min-height: 36px;
-    background: root.primary ? touch.pressed ? NexoraTheme.brand-pressed : touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand : touch.has-hover ? NexoraTheme.control-hover : NexoraTheme.control;
-    border-color: root.primary ? transparent : NexoraTheme.border;
+    background: root.primary ? touch.pressed ? BizTraceTheme.brand-pressed : touch.has-hover ? BizTraceTheme.brand-hover : BizTraceTheme.brand : touch.has-hover ? BizTraceTheme.control-hover : BizTraceTheme.control;
+    border-color: root.primary ? transparent : BizTraceTheme.border;
     border-width: root.primary ? 0px : 1px;
     border-radius: 7px;
     accessible-role: button;
@@ -35,7 +35,7 @@ export component RtlButton inherits Rectangle {
             width: 19px;
             background: transparent;
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 17px;

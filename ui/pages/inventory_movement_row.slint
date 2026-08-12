@@ -1,6 +1,6 @@
 // ui/pages/inventory_movement_row.slint
 
-import { NexoraTheme, RtlText } from "../components/mod.slint";
+import { BizTraceTheme, RtlText } from "../components/mod.slint";
 
 export struct MovementItemData {
     item-name: string,
@@ -17,8 +17,8 @@ export component InventoryMovementRow inherits Rectangle {
     in property <MovementItemData> item;
     in property <bool> narrow;
     height: 62px;
-    background: NexoraTheme.surface;
-    border-color: NexoraTheme.border;
+    background: BizTraceTheme.surface;
+    border-color: BizTraceTheme.border;
     border-width: 1px;
     border-radius: 8px;
     HorizontalLayout {
@@ -27,14 +27,14 @@ export component InventoryMovementRow inherits Rectangle {
         spacing: 12px;
         cross-axis-alignment: center;
         RtlText { width: 100px; text: (root.item.increases-stock ? "+ " : "− ") + root.item.quantity-label; color: root.item.increases-stock ? #69c58c : #e4868c; font-weight: 700; }
-        if !root.narrow : RtlText { width: 130px; text: root.item.total-cost-label; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
-        if !root.narrow : RtlText { width: 120px; text: root.item.occurred-on; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
-        if !root.narrow : RtlText { width: 140px; text: root.item.warehouse-name; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        if !root.narrow : RtlText { width: 130px; text: root.item.total-cost-label; color: BizTraceTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        if !root.narrow : RtlText { width: 120px; text: root.item.occurred-on; color: BizTraceTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        if !root.narrow : RtlText { width: 140px; text: root.item.warehouse-name; color: BizTraceTheme.text-muted; wrap: no-wrap; overflow: elide; }
         VerticalLayout {
             horizontal-stretch: 1;
             spacing: 1px;
             RtlText { text: root.item.item-name; font-weight: 600; wrap: no-wrap; overflow: elide; }
-            RtlText { text: root.item.reference.is-empty ? "بدون یادداشت" : root.item.reference; color: NexoraTheme.text-faint; font-size: 12px; wrap: no-wrap; overflow: elide; }
+            RtlText { text: root.item.reference.is-empty ? "بدون یادداشت" : root.item.reference; color: BizTraceTheme.text-faint; font-size: 12px; wrap: no-wrap; overflow: elide; }
         }
     }
 }

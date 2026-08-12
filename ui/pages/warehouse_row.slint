@@ -1,6 +1,6 @@
 // ui/pages/warehouse_row.slint
 
-import { IconButton, NexoraTheme, RtlText } from "../components/mod.slint";
+import { IconButton, BizTraceTheme, RtlText } from "../components/mod.slint";
 
 export struct WarehouseItemData {
     id: string,
@@ -14,8 +14,8 @@ export component WarehouseRow inherits Rectangle {
     callback edit;
     callback remove;
     height: 60px;
-    background: hover.has-hover ? NexoraTheme.surface-raised : NexoraTheme.surface;
-    border-color: NexoraTheme.border;
+    background: hover.has-hover ? BizTraceTheme.surface-raised : BizTraceTheme.surface;
+    border-color: BizTraceTheme.border;
     border-width: 1px;
     border-radius: 8px;
     animate background { duration: 120ms; }
@@ -27,7 +27,7 @@ export component WarehouseRow inherits Rectangle {
         cross-axis-alignment: center;
         IconButton { icon: @image-url("../../assets/icons/trash-2.svg"); label: "حذف انبار"; danger: true; clicked => { root.remove(); } }
         IconButton { icon: @image-url("../../assets/icons/pencil.svg"); label: "ویرایش انبار"; clicked => { root.edit(); } }
-        RtlText { horizontal-stretch: 1; text: root.item.address.is-empty ? "نشانی ثبت نشده" : root.item.address; color: NexoraTheme.text-muted; wrap: no-wrap; overflow: elide; }
+        RtlText { horizontal-stretch: 1; text: root.item.address.is-empty ? "نشانی ثبت نشده" : root.item.address; color: BizTraceTheme.text-muted; wrap: no-wrap; overflow: elide; }
         RtlText { width: 190px; text: root.item.name; font-weight: 600; wrap: no-wrap; overflow: elide; }
     }
 }

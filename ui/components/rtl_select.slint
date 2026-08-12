@@ -1,7 +1,7 @@
 // ui/components/rtl_select.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export component RtlSelect inherits Rectangle {
@@ -11,8 +11,8 @@ export component RtlSelect inherits Rectangle {
     callback selected(string);
     min-height: 34px;
     min-width: 120px;
-    background: NexoraTheme.control;
-    border-color: touch.has-hover ? NexoraTheme.brand : NexoraTheme.border;
+    background: BizTraceTheme.control;
+    border-color: touch.has-hover ? BizTraceTheme.brand : BizTraceTheme.border;
     border-width: 1px;
     border-radius: 6px;
     accessible-role: combobox;
@@ -28,13 +28,13 @@ export component RtlSelect inherits Rectangle {
         Rectangle {
             width: 14px;
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 14px;
                 height: 14px;
                 source: @image-url("../../assets/icons/chevron-down.svg");
-                tint: NexoraTheme.text-muted;
+                tint: BizTraceTheme.text-muted;
             }
         }
         RtlText {
@@ -55,8 +55,8 @@ export component RtlSelect inherits Rectangle {
         close-policy: close-on-click-outside;
 
         Rectangle {
-            background: NexoraTheme.control;
-            border-color: NexoraTheme.border;
+            background: BizTraceTheme.control;
+            border-color: BizTraceTheme.border;
             border-width: 1px;
             border-radius: 7px;
 
@@ -65,7 +65,7 @@ export component RtlSelect inherits Rectangle {
 
                 for option[index] in root.model : Rectangle {
                     height: 38px;
-                    background: option-touch.has-hover || index == root.current-index ? NexoraTheme.control-hover : transparent;
+                    background: option-touch.has-hover || index == root.current-index ? BizTraceTheme.control-hover : transparent;
                     border-radius: 5px;
 
                     RtlText {

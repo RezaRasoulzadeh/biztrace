@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn generated_template_can_be_read_back() {
         let path = std::env::temp_dir().join(format!(
-            "nexora-catalog-template-{}.xlsx",
+            "biztrace-catalog-template-{}.xlsx",
             std::process::id()
         ));
         write_catalog_template(&path).unwrap();
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn catalog_export_can_be_imported_again() {
         let path =
-            std::env::temp_dir().join(format!("nexora-catalog-export-{}.xlsx", std::process::id()));
+            std::env::temp_dir().join(format!("biztrace-catalog-export-{}.xlsx", std::process::id()));
         write_catalog_export(
             &path,
             &[CatalogRecord {

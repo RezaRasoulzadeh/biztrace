@@ -1,7 +1,7 @@
 // ui/components/empty_state.slint
 
-import { NexoraIcon } from "nexora_icon.slint";
-import { NexoraTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
+import { BizTraceTheme } from "theme.slint";
 import { RtlButton } from "rtl_button.slint";
 import { RtlCard } from "rtl_card.slint";
 import { RtlText } from "rtl_text.slint";
@@ -24,13 +24,13 @@ export component EmptyState inherits RtlCard {
             height: 42px;
             background: transparent;
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 34px;
                 height: 34px;
                 source: root.icon;
-                tint: NexoraTheme.brand-soft;
+                tint: BizTraceTheme.brand-soft;
             }
         }
 
@@ -45,7 +45,7 @@ export component EmptyState inherits RtlCard {
         RtlText {
             height: 44px;
             text: root.description;
-            color: NexoraTheme.text-muted;
+            color: BizTraceTheme.text-muted;
             horizontal-alignment: center;
         }
 

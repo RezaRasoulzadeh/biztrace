@@ -1,6 +1,6 @@
 // tests/database.rs
 
-use nexora::database::{CatalogDraft, Database, InventoryImportRow, InventoryMovementDraft};
+use biztrace::database::{CatalogDraft, Database, InventoryImportRow, InventoryMovementDraft};
 
 #[test]
 fn initial_schema_is_created_and_versioned() {

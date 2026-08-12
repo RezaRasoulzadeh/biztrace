@@ -117,12 +117,12 @@ impl Database {
     }
 
     pub fn default_path() -> Result<PathBuf, DatabaseError> {
-        if let Some(path) = env::var_os("NEXORA_DATABASE_PATH") {
+        if let Some(path) = env::var_os("BIZTRACE_DATABASE_PATH") {
             return Ok(PathBuf::from(path));
         }
-        let directories = ProjectDirs::from("com", "Nexora", "Nexora")
+        let directories = ProjectDirs::from("com", "BizTrace", "BizTrace")
             .ok_or(DatabaseError::DataDirectoryUnavailable)?;
-        Ok(directories.data_local_dir().join("nexora.sqlite3"))
+        Ok(directories.data_local_dir().join("biztrace.sqlite3"))
     }
 
     pub fn schema_version(&self) -> Result<i64, DatabaseError> {

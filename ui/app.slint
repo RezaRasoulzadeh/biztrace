@@ -1,6 +1,6 @@
 // ui/app.slint
 
-import { FormattedInput, NexoraTheme, RtlSidebar, RtlToast, RtlTopNav, SearchOption } from "components/mod.slint";
+import { FormattedInput, BizTraceTheme, RtlSidebar, RtlToast, RtlTopNav, SearchOption } from "components/mod.slint";
 import {
     CatalogPage,
     CatalogItemData,
@@ -17,13 +17,13 @@ import {
 } from "pages/mod.slint";
 
 export component AppWindow inherits Window {
-    title: "Nexora";
+    title: "BizTrace";
     preferred-width: 1080px;
     preferred-height: 720px;
     min-width: 420px;
     min-height: 480px;
-    background: NexoraTheme.canvas;
-    default-font-family: NexoraTheme.font-family;
+    background: BizTraceTheme.canvas;
+    default-font-family: BizTraceTheme.font-family;
 
     in-out property <int> navigation-index;
     in-out property <bool> navigation-expanded: true;

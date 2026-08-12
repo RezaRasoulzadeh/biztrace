@@ -1,4 +1,4 @@
-Here’s a practical roadmap that builds Nexora in vertical, testable increments.
+Here’s a practical roadmap that builds BizTrace in vertical, testable increments.
 
 ## Phase 0 — Foundations
 

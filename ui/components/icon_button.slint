@@ -1,7 +1,7 @@
 // ui/components/icon_button.slint
 
-import { NexoraIcon } from "nexora_icon.slint";
-import { NexoraTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
+import { BizTraceTheme } from "theme.slint";
 
 export component IconButton inherits Rectangle {
     in property <image> icon;
@@ -10,19 +10,19 @@ export component IconButton inherits Rectangle {
     callback clicked;
     width: 34px;
     height: 34px;
-    background: touch.pressed ? NexoraTheme.control : touch.has-hover ? NexoraTheme.control-hover : transparent;
+    background: touch.pressed ? BizTraceTheme.control : touch.has-hover ? BizTraceTheme.control-hover : transparent;
     border-radius: 6px;
     accessible-role: button;
     accessible-label: root.label;
     animate background { duration: 100ms; }
 
-    NexoraIcon {
+    BizTraceIcon {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         width: 17px;
         height: 17px;
         source: root.icon;
-        tint: root.danger ? #ef9a9a : NexoraTheme.text-muted;
+        tint: root.danger ? #ef9a9a : BizTraceTheme.text-muted;
     }
 
     touch := TouchArea { clicked => { root.clicked(); } }

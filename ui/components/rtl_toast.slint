@@ -1,7 +1,7 @@
 // ui/components/rtl_toast.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export component RtlToast inherits Rectangle {
@@ -13,7 +13,7 @@ export component RtlToast inherits Rectangle {
     height: 54px;
     opacity: root.open ? 1 : 0;
     y: root.open ? 20px : -root.height;
-    background: NexoraTheme.brand;
+    background: BizTraceTheme.brand;
     border-width: 0px;
     border-radius: 0px;
     drop-shadow-color: #80000000;
@@ -41,7 +41,7 @@ export component RtlToast inherits Rectangle {
         Rectangle {
             width: 24px;
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 16px;

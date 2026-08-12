@@ -4,11 +4,11 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use nexora::database::{
+use biztrace::database::{
     CatalogDraft, CatalogRecord, Database, DatabaseError, InventoryMovementDraft, MovementRecord,
     StockRecord, WarehouseRecord,
 };
-use nexora::import::{
+use biztrace::import::{
     read_catalog_excel, read_inventory_excel, write_catalog_export, write_catalog_template,
     write_inventory_export, write_inventory_template,
 };
@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = slint::spawn_local(async move {
             let Some(file) = AsyncFileDialog::new()
                 .set_title("ذخیره فایل نمونه کالاها و خدمات")
-                .set_file_name("nexora-catalog-template.xlsx")
+                .set_file_name("biztrace-catalog-template.xlsx")
                 .add_filter("Excel", &["xlsx"])
                 .save_file()
                 .await
@@ -675,7 +675,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = slint::spawn_local(async move {
             let Some(file) = AsyncFileDialog::new()
                 .set_title("ذخیره فایل نمونه موجودی")
-                .set_file_name("nexora-inventory-template.xlsx")
+                .set_file_name("biztrace-inventory-template.xlsx")
                 .add_filter("Excel", &["xlsx"])
                 .save_file()
                 .await
@@ -756,7 +756,7 @@ fn export_catalog(app: &AppWindow, database: &Database, selected_only: bool) {
     let _ = slint::spawn_local(async move {
         let Some(file) = AsyncFileDialog::new()
             .set_title("ذخیره خروجی کالاها")
-            .set_file_name("nexora-catalog-export.xlsx")
+            .set_file_name("biztrace-catalog-export.xlsx")
             .add_filter("Excel", &["xlsx"])
             .save_file()
             .await
@@ -793,7 +793,7 @@ fn export_inventory(app: &AppWindow, database: &Database, selected_only: bool) {
     let _ = slint::spawn_local(async move {
         let Some(file) = AsyncFileDialog::new()
             .set_title("ذخیره خروجی موجودی")
-            .set_file_name("nexora-inventory-export.xlsx")
+            .set_file_name("biztrace-inventory-export.xlsx")
             .add_filter("Excel", &["xlsx"])
             .save_file()
             .await

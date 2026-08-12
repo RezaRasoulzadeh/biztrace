@@ -591,6 +591,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "biztrace"
+version = "0.1.0"
+dependencies = [
+ "calamine",
+ "directories",
+ "fontique",
+ "rfd",
+ "rusqlite",
+ "rust_xlsxwriter",
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "block2"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2984,20 +2998,6 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
-
-[[package]]
-name = "nexora"
-version = "0.1.0"
-dependencies = [
- "calamine",
- "directories",
- "fontique",
- "rfd",
- "rusqlite",
- "rust_xlsxwriter",
- "slint",
- "slint-build",
-]
 
 [[package]]
 name = "nix"

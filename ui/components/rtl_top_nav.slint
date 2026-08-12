@@ -1,20 +1,20 @@
 // ui/components/rtl_top_nav.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 import { RtlText } from "rtl_text.slint";
 
 export component RtlTopNav inherits Rectangle {
     in property <string> user-name;
     callback profile-clicked;
     height: 62px;
-    background: NexoraTheme.surface;
+    background: BizTraceTheme.surface;
 
     Rectangle {
         y: parent.height - 1px;
         width: parent.width;
         height: 1px;
-        background: NexoraTheme.border;
+        background: BizTraceTheme.border;
     }
 
     profile := Rectangle {
@@ -22,10 +22,10 @@ export component RtlTopNav inherits Rectangle {
         y: (parent.height - self.height) / 2;
         width: 38px;
         height: 38px;
-        background: profile-touch.has-hover ? NexoraTheme.brand-hover : NexoraTheme.brand;
+        background: profile-touch.has-hover ? BizTraceTheme.brand-hover : BizTraceTheme.brand;
         border-radius: 19px;
 
-        NexoraIcon {
+        BizTraceIcon {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 19px;
@@ -53,8 +53,8 @@ export component RtlTopNav inherits Rectangle {
         y: 0;
         width: 146px;
         height: parent.height;
-        text: "NEXORA";
-        color: NexoraTheme.brand;
+        text: "BIZTRACE";
+        color: BizTraceTheme.brand;
         font-size: 25px;
         font-weight: 700;
         horizontal-alignment: right;

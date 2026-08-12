@@ -1,6 +1,6 @@
 // tests/models.rs
 
-use nexora::models::{
+use biztrace::models::{
     CatalogItem, CatalogItemId, Currency, Date, Invoice, InvoiceId, InvoiceLine, InvoiceStatus,
     ItemKind, ModelError, Money, Quantity, Unit, UserId,
 };

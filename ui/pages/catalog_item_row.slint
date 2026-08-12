@@ -1,6 +1,6 @@
 // ui/pages/catalog_item_row.slint
 
-import { IconButton, NexoraTheme, RtlText, SelectBox } from "../components/mod.slint";
+import { IconButton, BizTraceTheme, RtlText, SelectBox } from "../components/mod.slint";
 
 export struct CatalogItemData {
     id: string,
@@ -28,8 +28,8 @@ export component CatalogItemRow inherits Rectangle {
         width: root.width - 72px;
         height: parent.height;
         clip: true;
-        background: row-touch.has-hover ? NexoraTheme.surface-raised : NexoraTheme.surface;
-        border-color: NexoraTheme.border;
+        background: row-touch.has-hover ? BizTraceTheme.surface-raised : BizTraceTheme.surface;
+        border-color: BizTraceTheme.border;
         border-width: 1px;
         border-radius: 8px;
         animate background { duration: 120ms; }
@@ -53,7 +53,7 @@ export component CatalogItemRow inherits Rectangle {
             if !root.narrow : RtlText {
             width: 90px;
             text: root.item.unit-label;
-            color: NexoraTheme.text-muted;
+            color: BizTraceTheme.text-muted;
             wrap: no-wrap;
             overflow: elide;
         }
@@ -65,7 +65,7 @@ export component CatalogItemRow inherits Rectangle {
             RtlText { text: root.item.name; font-weight: 600; wrap: no-wrap; overflow: elide; }
             RtlText {
                 text: root.item.sku.is-empty ? root.item.kind-label : root.item.kind-label + "  •  " + root.item.sku;
-                color: NexoraTheme.text-faint;
+                color: BizTraceTheme.text-faint;
                 font-size: 12px;
                 wrap: no-wrap;
                 overflow: elide;

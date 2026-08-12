@@ -1,7 +1,7 @@
 // ui/components/metric_card.slint
 
-import { NexoraIcon } from "nexora_icon.slint";
-import { NexoraTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
+import { BizTraceTheme } from "theme.slint";
 import { RtlCard } from "rtl_card.slint";
 import { RtlText } from "rtl_text.slint";
 
@@ -11,13 +11,13 @@ export component MetricCard inherits RtlCard {
     in property <int> value;
     height: 104px;
 
-    NexoraIcon {
+    BizTraceIcon {
         x: 16px;
         y: 16px;
         width: 24px;
         height: 24px;
         source: root.icon;
-        tint: NexoraTheme.brand-soft;
+        tint: BizTraceTheme.brand-soft;
     }
 
     RtlText {
@@ -26,7 +26,7 @@ export component MetricCard inherits RtlCard {
         width: parent.width - 68px;
         height: 30px;
         text: root.label;
-        color: NexoraTheme.text-muted;
+        color: BizTraceTheme.text-muted;
         wrap: no-wrap;
         overflow: elide;
     }

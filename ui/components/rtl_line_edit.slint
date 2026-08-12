@@ -1,7 +1,7 @@
 // ui/components/rtl_line_edit.slint
 
-import { NexoraTheme } from "theme.slint";
-import { NexoraIcon } from "nexora_icon.slint";
+import { BizTraceTheme } from "theme.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
 
 export struct FormattedInput {
     text: string,
@@ -23,7 +23,7 @@ export component RtlLineEdit inherits Rectangle {
     callback format-numeric(string, int) -> FormattedInput;
     min-height: 34px;
     min-width: 120px;
-    background: root.enabled ? input.has-focus ? NexoraTheme.control-hover : NexoraTheme.control : NexoraTheme.surface-raised;
+    background: root.enabled ? input.has-focus ? BizTraceTheme.control-hover : BizTraceTheme.control : BizTraceTheme.surface-raised;
     border-width: 0px;
     border-radius: 6px;
     clip: true;
@@ -45,7 +45,7 @@ export component RtlLineEdit inherits Rectangle {
         y: parent.height - self.height;
         width: parent.width;
         height: input.has-focus ? 3px : 1px;
-        background: input.has-focus ? NexoraTheme.brand : NexoraTheme.border;
+        background: input.has-focus ? BizTraceTheme.brand : BizTraceTheme.border;
     }
 
     HorizontalLayout {
@@ -56,13 +56,13 @@ export component RtlLineEdit inherits Rectangle {
         if !root.text.is-empty && root.enabled && !root.read-only : Rectangle {
             width: 18px;
 
-            NexoraIcon {
+            BizTraceIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 15px;
                 height: 15px;
                 source: @image-url("../../assets/icons/x.svg");
-                tint: clear-touch.has-hover ? NexoraTheme.text : NexoraTheme.text-muted;
+                tint: clear-touch.has-hover ? BizTraceTheme.text : BizTraceTheme.text-muted;
             }
 
             clear-touch := TouchArea {
@@ -82,7 +82,7 @@ export component RtlLineEdit inherits Rectangle {
                 width: parent.width;
                 height: parent.height;
                 text: root.text.is-empty && input.preedit-text.is-empty ? root.placeholder-text : "";
-                color: NexoraTheme.text-faint;
+                color: BizTraceTheme.text-faint;
                 font-size: 14px;
                 horizontal-alignment: right;
                 vertical-alignment: center;
@@ -99,12 +99,12 @@ export component RtlLineEdit inherits Rectangle {
                 read-only: root.read-only;
                 input-type: root.input-type;
                 single-line: true;
-                color: root.enabled ? NexoraTheme.text : NexoraTheme.text-faint;
+                color: root.enabled ? BizTraceTheme.text : BizTraceTheme.text-faint;
                 font-size: 14px;
                 horizontal-alignment: right;
                 vertical-alignment: center;
                 selection-foreground-color: white;
-                selection-background-color: NexoraTheme.brand;
+                selection-background-color: BizTraceTheme.brand;
                 accessible-role: none;
 
                 cursor-position-changed(cursor-position) => {
