@@ -131,9 +131,13 @@ impl Database {
             ));
         }
         let transaction = self.connection.unchecked_transaction()?;
+        // Free the sku so it can be reused by future items; the unique
+        // constraint on sku applies to inactive rows too.
         transaction.execute(
             "UPDATE catalog_items
-             SET active = 0, updated_at = CURRENT_TIMESTAMP
+             SET active = 0,
+                 sku = CASE WHEN sku IS NOT NULL THEN sku || '-removed-' || id ELSE sku END,
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = ?1 AND active = 1",
             [id],
         )?;
