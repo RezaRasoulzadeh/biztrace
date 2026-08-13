@@ -29,14 +29,6 @@ export component PersianDatePicker inherits Rectangle {
         root.day = DateService.jalali-component(date, 2);
     }
 
-    changed value => {
-        if !root.value.is-empty {
-            root.year = DateService.jalali-component(root.value, 0);
-            root.month = DateService.jalali-component(root.value, 1);
-            root.day = DateService.jalali-component(root.value, 2);
-        }
-    }
-
     HorizontalLayout {
         spacing: 12px;
         VerticalLayout {
