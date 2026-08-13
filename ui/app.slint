@@ -82,9 +82,9 @@ export component AppWindow inherits Window {
     in property <int> fund-selected-count;
     callback fund-save-account(string,string,string,int,string);
     callback fund-remove-account(string);
-    callback fund-save-transaction(string,int,int,int,string,string,string,string,string);
+    callback fund-save-transaction(string,int,int,int,string,string,string,string);
     callback fund-remove-transaction(string);
-    callback fund-save-check(string,int,int,string,string,string,string,string,string);
+    callback fund-save-check(string,int,int,int,string,string,string,string,string,string);
     callback fund-remove-check(string);
     callback fund-selection-changed(int,string,bool);
     callback fund-select-all(int);
@@ -290,7 +290,7 @@ export component AppWindow inherits Window {
         height: parent.height - top-nav.height;
         narrow: root.narrow-content;
         accounts:root.fund-accounts;transactions:root.fund-transactions;checks:root.fund-checks;account-names:root.fund-account-names;search-text<=>root.fund-search-text;account-editor-open<=>root.fund-account-editor-open;transaction-editor-open<=>root.fund-transaction-editor-open;check-editor-open<=>root.fund-check-editor-open;editor-error:root.fund-editor-error;selected-count:root.fund-selected-count;
-        format-amount(v,c)=>{return root.customer-format-balance(v,c);} to-gregorian(y,m,d)=>{return root.fund-to-gregorian(y,m,d);} calendar-day(y,m,c)=>{return root.fund-calendar-day(y,m,c);} download-template(tab)=>{root.fund-download-template(tab);} import-excel(tab)=>{root.fund-import-excel(tab);} export-data(tab)=>{root.fund-export-data(tab);} search(v)=>{root.fund-search(v);} save-account(id,name,number,kind,balance)=>{root.fund-save-account(id,name,number,kind,balance);} remove-account(id)=>{root.fund-remove-account(id);} save-transaction(id,kind,account,target,amount,category,date,reference,description)=>{root.fund-save-transaction(id,kind,account,target,amount,category,date,reference,description);} remove-transaction(id)=>{root.fund-remove-transaction(id);} remove-check(id)=>{root.fund-remove-check(id);} selection-changed(tab,id,value)=>{root.fund-selection-changed(tab,id,value);} select-all(tab)=>{root.fund-select-all(tab);} clear-selection(tab)=>{root.fund-clear-selection(tab);} remove-selected(tab)=>{root.fund-remove-selected(tab);} save-check(id,direction,account,party,number,bank,amount,due,note)=>{root.fund-save-check(id,direction,account,party,number,bank,amount,due,note);} check-status(id,status)=>{root.fund-check-status(id,status);}
+        format-amount(v,c)=>{return root.customer-format-balance(v,c);} to-gregorian(y,m,d)=>{return root.fund-to-gregorian(y,m,d);} calendar-day(y,m,c)=>{return root.fund-calendar-day(y,m,c);} download-template(tab)=>{root.fund-download-template(tab);} import-excel(tab)=>{root.fund-import-excel(tab);} export-data(tab)=>{root.fund-export-data(tab);} search(v)=>{root.fund-search(v);} save-account(id,name,number,kind,balance)=>{root.fund-save-account(id,name,number,kind,balance);} remove-account(id)=>{root.fund-remove-account(id);} save-transaction(id,kind,account,target,amount,date,reference,description)=>{root.fund-save-transaction(id,kind,account,target,amount,date,reference,description);} remove-transaction(id)=>{root.fund-remove-transaction(id);} remove-check(id)=>{root.fund-remove-check(id);} selection-changed(tab,id,value)=>{root.fund-selection-changed(tab,id,value);} select-all(tab)=>{root.fund-select-all(tab);} clear-selection(tab)=>{root.fund-clear-selection(tab);} remove-selected(tab)=>{root.fund-remove-selected(tab);} save-check(id,type,direction,account,party,number,bank,amount,due,note)=>{root.fund-save-check(id,type,direction,account,party,number,bank,amount,due,note);} check-status(id,status)=>{root.fund-check-status(id,status);}
     }
 
     if root.navigation-index == 6 : UsersPage {

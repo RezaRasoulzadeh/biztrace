@@ -323,7 +323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weak = app.as_weak();
     let fund_db = Rc::clone(&database);
     app.on_fund_save_transaction(
-        move |id, kind, account, target, amount, category, date, reference, description| {
+        move |id, kind, account, target, amount, date, reference, description| {
             let Some(app) = weak.upgrade() else { return };
             app.set_fund_editor_error("".into());
             let Ok(accounts) = fund_db.fund_accounts() else {
@@ -338,6 +338,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 None
             };
+            if kind == 2 && target_id == Some(source.id) {
+                app.set_fund_editor_error("حساب مبدأ و مقصد انتقال باید متفاوت باشند".into());
+                return;
+            }
             let Some(amount) = parse_amount(&amount).filter(|v| *v > 0) else {
                 app.set_fund_editor_error("مبلغ معتبر وارد کنید".into());
                 return;
@@ -352,7 +356,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 .into(),
                 amount_minor: amount,
-                category: category.trim().into(),
+                category: match kind {
+                    0 => "درآمد",
+                    1 => "هزینه",
+                    _ => "انتقال",
+                }
+                .into(),
                 occurred_on: date.trim().into(),
                 reference: (!reference.trim().is_empty()).then(|| reference.trim().into()),
                 description: (!description.trim().is_empty()).then(|| description.trim().into()),
@@ -389,7 +398,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weak = app.as_weak();
     let fund_db = Rc::clone(&database);
     app.on_fund_save_check(
-        move |id, direction, account, party, number, bank, amount, due, note| {
+        move |id, schedule_type, direction, account, party, number, bank, amount, due, note| {
             let Some(app) = weak.upgrade() else { return };
             app.set_fund_editor_error("".into());
             let Ok(accounts) = fund_db.fund_accounts() else {
@@ -404,6 +413,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return;
             };
             let draft = FundCheckDraft {
+                schedule_type: match schedule_type {
+                    0 => "check",
+                    1 => "installment",
+                    _ => "scheduled",
+                }
+                .into(),
                 direction: if direction == 0 {
                     "incoming"
                 } else {
@@ -432,7 +447,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     app.set_status_message("چک ثبت شد".into());
                     app.set_notification_open(true);
                 }
-                Err(_) => app.set_fund_editor_error("اطلاعات چک یا شماره آن معتبر نیست".into()),
+                Err(_) => app.set_fund_editor_error("اطلاعات پرداخت زمان‌بندی‌شده معتبر نیست".into()),
             }
         },
     );
@@ -1616,7 +1631,7 @@ fn import_fund_data(database: &Database, data: FundImportFile) -> Result<usize, 
                 database
                     .save_fund_account(&FundAccountDraft {
                         id: None,
-                        kind: r.kind,
+                        kind: r.kind.clone(),
                         name: r.name,
                         account_number: r.number,
                         opening_balance_minor: r.opening,
@@ -1647,9 +1662,14 @@ fn import_fund_data(database: &Database, data: FundImportFile) -> Result<usize, 
                     .save_fund_transaction(&FundTransactionDraft {
                         account_id: source.id,
                         transfer_account_id: target,
-                        kind: r.kind,
+                        kind: r.kind.clone(),
                         amount_minor: r.amount,
-                        category: r.category,
+                        category: match r.kind.as_str() {
+                            "income" => "درآمد",
+                            "expense" => "هزینه",
+                            _ => "انتقال",
+                        }
+                        .into(),
                         occurred_on: r.date,
                         reference: r.reference,
                         description: r.description,
@@ -1668,6 +1688,7 @@ fn import_fund_data(database: &Database, data: FundImportFile) -> Result<usize, 
                     .ok_or_else(|| format!("حساب «{}» پیدا نشد", r.account))?;
                 database
                     .save_fund_check(&FundCheckDraft {
+                        schedule_type: r.schedule_type,
                         direction: r.direction,
                         account_id: account.id,
                         party_name: r.party,
@@ -1752,7 +1773,6 @@ fn fund_transaction_model(
                 },
                 amount_label: format_amount(r.amount_minor),
                 amount_value: format_number(r.amount_minor).into(),
-                category: r.category.into(),
                 occurred_on: r.occurred_on.into(),
                 reference: r.reference.into(),
                 description: r.description.into(),
@@ -1770,6 +1790,17 @@ fn fund_check_model(
             .map(|r| FundCheckData {
                 id: r.id.to_string().into(),
                 selected: FUND_CHECK_SELECTION.with(|s| s.borrow().contains(&r.id)),
+                type_index: match r.schedule_type.as_str() {
+                    "check" => 0,
+                    "installment" => 1,
+                    _ => 2,
+                },
+                type_label: match r.schedule_type.as_str() {
+                    "check" => "چک",
+                    "installment" => "قسط",
+                    _ => "زمان‌بندی‌شده",
+                }
+                .into(),
                 direction_index: if r.direction == "incoming" { 0 } else { 1 },
                 account_index: accounts
                     .iter()

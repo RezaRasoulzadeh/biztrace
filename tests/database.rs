@@ -8,7 +8,7 @@ use biztrace::database::{
 #[test]
 fn initial_schema_is_created_and_versioned() {
     let database = Database::open_in_memory().unwrap();
-    assert_eq!(database.schema_version().unwrap(), 12);
+    assert_eq!(database.schema_version().unwrap(), 13);
     assert_eq!(database.overview_counts().unwrap().fund_accounts, 1);
     assert_eq!(database.fund_accounts().unwrap()[0].name, "صندوق اصلی");
 }
@@ -46,6 +46,20 @@ fn funds_track_account_balances_transactions_and_upcoming_checks() {
             description: None,
         })
         .unwrap();
+    assert!(
+        database
+            .save_fund_transaction(&FundTransactionDraft {
+                account_id: bank,
+                transfer_account_id: Some(bank),
+                kind: "transfer".into(),
+                amount_minor: 1,
+                category: "transfer".into(),
+                occurred_on: "2026-08-14".into(),
+                reference: Some("INVALID-SAME-ACCOUNT".into()),
+                description: None,
+            })
+            .is_err()
+    );
     database
         .save_fund_transaction(&FundTransactionDraft {
             account_id: bank,
@@ -77,6 +91,7 @@ fn funds_track_account_balances_transactions_and_upcoming_checks() {
     );
     let check = database
         .save_fund_check(&FundCheckDraft {
+            schedule_type: "check".into(),
             direction: "outgoing".into(),
             account_id: bank,
             party_name: "Supplier".into(),
@@ -87,9 +102,31 @@ fn funds_track_account_balances_transactions_and_upcoming_checks() {
             note: None,
         })
         .unwrap();
+    database
+        .save_fund_check(&FundCheckDraft {
+            schedule_type: "installment".into(),
+            direction: "outgoing".into(),
+            account_id: cash,
+            party_name: "Landlord".into(),
+            check_number: String::new(),
+            bank_name: None,
+            amount_minor: 100_000,
+            due_on: "2026-10-01".into(),
+            note: Some("Rent installment".into()),
+        })
+        .unwrap();
     assert_eq!(database.fund_checks("").unwrap()[0].status, "upcoming");
     database.set_fund_check_status(check, "cleared").unwrap();
-    assert_eq!(database.fund_checks("").unwrap()[0].status, "cleared");
+    assert_eq!(
+        database
+            .fund_checks("")
+            .unwrap()
+            .into_iter()
+            .find(|item| item.id == check)
+            .unwrap()
+            .status,
+        "cleared"
+    );
     assert_eq!(
         database
             .fund_accounts()

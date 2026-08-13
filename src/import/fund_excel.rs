@@ -22,12 +22,12 @@ pub struct TransactionImport {
     pub account: String,
     pub target: Option<String>,
     pub amount: i64,
-    pub category: String,
     pub date: String,
     pub reference: Option<String>,
     pub description: Option<String>,
 }
 pub struct CheckImport {
+    pub schedule_type: String,
     pub direction: String,
     pub account: String,
     pub party: String,
@@ -43,17 +43,17 @@ const AH: [&str; 4] = [
     "شماره/شناسه",
     "موجودی افتتاحیه (ریال)",
 ];
-const TH: [&str; 8] = [
+const TH: [&str; 7] = [
     "نوع",
     "حساب",
     "حساب مقصد",
     "مبلغ (ریال)",
-    "دسته‌بندی",
     "تاریخ شمسی",
     "شناسه پیگیری",
     "شرح",
 ];
-const CH: [&str; 8] = [
+const CH: [&str; 9] = [
+    "نوع سند",
     "جهت",
     "حساب مرتبط",
     "طرف حساب",
@@ -88,12 +88,12 @@ pub fn write_fund_template(path: &Path, tab: i32) -> Result<(), String> {
             "بانک ملت",
             "",
             "2500000",
-            "فروش",
             "1405/05/22",
             "TRX-1001",
             "فروش نقدی",
         ],
         _ => vec![
+            "چک",
             "دریافتی",
             "بانک ملت",
             "شرکت نمونه",
@@ -155,7 +155,6 @@ pub fn write_fund_export(
                     r.account_name.as_str(),
                     r.transfer_account_name.as_str(),
                     "",
-                    r.category.as_str(),
                     date.as_str(),
                     r.reference.as_str(),
                     r.description.as_str(),
@@ -178,6 +177,7 @@ pub fn write_fund_export(
                 let row = (i + 1) as u32;
                 let due = jalali(&r.due_on);
                 for (c, v) in [
+                    schedule_label(&r.schedule_type),
                     if r.direction == "incoming" {
                         "دریافتی"
                     } else {
@@ -194,7 +194,7 @@ pub fn write_fund_export(
                 .iter()
                 .enumerate()
                 {
-                    if c == 5 {
+                    if c == 6 {
                         s.write_number(row, c as u16, r.amount_minor as f64)
                             .map_err(|e| e.to_string())?;
                     } else {
@@ -244,7 +244,7 @@ pub fn read_fund_excel(path: &Path, tab: i32) -> Result<FundImportFile, String> 
     if tab == 1 {
         let mut out = vec![];
         for r in rows {
-            let v = (0..8).map(|i| text(r.get(i))).collect::<Vec<_>>();
+            let v = (0..7).map(|i| text(r.get(i))).collect::<Vec<_>>();
             if v.iter().all(|x| x.trim().is_empty()) {
                 continue;
             }
@@ -253,34 +253,46 @@ pub fn read_fund_excel(path: &Path, tab: i32) -> Result<FundImportFile, String> 
                 account: required(&v[1])?,
                 target: optional(&v[2]),
                 amount: amount(&v[3])?,
-                category: required(&v[4])?,
-                date: parse_jalali(v[5].trim()).ok_or("تاریخ شمسی نامعتبر است")?,
-                reference: optional(&v[6]),
-                description: optional(&v[7]),
+                date: parse_jalali(v[4].trim()).ok_or("تاریخ شمسی نامعتبر است")?,
+                reference: optional(&v[5]),
+                description: optional(&v[6]),
             });
         }
         return Ok(FundImportFile::Transactions(out));
     }
     let mut out = vec![];
     for r in rows {
-        let v = (0..8).map(|i| text(r.get(i))).collect::<Vec<_>>();
+        let v = (0..9).map(|i| text(r.get(i))).collect::<Vec<_>>();
         if v.iter().all(|x| x.trim().is_empty()) {
             continue;
         }
-        let direction = match v[0].trim() {
+        let schedule_type = match v[0].trim() {
+            "چک" => "check",
+            "قسط" => "installment",
+            "زمان‌بندی‌شده" | "دریافت/پرداخت زمان‌بندی‌شده" => {
+                "scheduled"
+            }
+            _ => return Err("نوع سند نامعتبر است".into()),
+        };
+        let direction = match v[1].trim() {
             "دریافتی" => "incoming",
             "پرداختی" => "outgoing",
             _ => return Err("جهت چک نامعتبر است".into()),
         };
         out.push(CheckImport {
+            schedule_type: schedule_type.into(),
             direction: direction.into(),
-            account: required(&v[1])?,
-            party: required(&v[2])?,
-            number: required(&v[3])?,
-            bank: optional(&v[4]),
-            amount: amount(&v[5])?,
-            due: parse_jalali(v[6].trim()).ok_or("سررسید شمسی نامعتبر است")?,
-            note: optional(&v[7]),
+            account: required(&v[2])?,
+            party: required(&v[3])?,
+            number: if schedule_type == "check" {
+                required(&v[4])?
+            } else {
+                v[4].trim().into()
+            },
+            bank: optional(&v[5]),
+            amount: amount(&v[6])?,
+            due: parse_jalali(v[7].trim()).ok_or("سررسید شمسی نامعتبر است")?,
+            note: optional(&v[8]),
         });
     }
     Ok(FundImportFile::Checks(out))
@@ -329,6 +341,13 @@ fn transaction_label(v: &str) -> &str {
         "income" => "درآمد",
         "expense" => "هزینه",
         _ => "انتقال",
+    }
+}
+fn schedule_label(value: &str) -> &str {
+    match value {
+        "check" => "چک",
+        "installment" => "قسط",
+        _ => "زمان‌بندی‌شده",
     }
 }
 fn jalali(v: &str) -> String {

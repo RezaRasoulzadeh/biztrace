@@ -1,8 +1,8 @@
 import { IconButton, BizTraceTheme, RtlText, SelectBox } from "../components/mod.slint";
 
 export struct FundAccountData { id:string, name:string, kind-label:string, account-number:string, opening-value:string, balance-label:string, selected:bool }
-export struct FundTransactionData { id:string, selected:bool, kind-label:string, kind-index:int, account-index:int, target-index:int, account-label:string, amount-label:string, amount-value:string, category:string, occurred-on:string, reference:string, description:string }
-export struct FundCheckData { id:string, selected:bool, direction-label:string, direction-index:int, account-index:int, party-name:string, account-name:string, check-number:string, bank-name:string, amount-label:string, amount-value:string, due-on:string, status-code:string, status-label:string, note:string }
+export struct FundTransactionData { id:string, selected:bool, kind-label:string, kind-index:int, account-index:int, target-index:int, account-label:string, amount-label:string, amount-value:string, occurred-on:string, reference:string, description:string }
+export struct FundCheckData { id:string, selected:bool, type-label:string, type-index:int, direction-label:string, direction-index:int, account-index:int, party-name:string, account-name:string, check-number:string, bank-name:string, amount-label:string, amount-value:string, due-on:string, status-code:string, status-label:string, note:string }
 
 export component FundAccountRow inherits Rectangle {
  in property <FundAccountData> item; callback edit; callback remove; callback selection-changed(bool); height:64px; background:transparent;
@@ -24,7 +24,7 @@ export component FundTransactionRow inherits Rectangle {
    IconButton { icon:@image-url("../../assets/icons/pencil.svg"); label:"ویرایش"; clicked=>{root.edit();} }
    RtlText { width:120px; text:root.item.occurred-on; color:BizTraceTheme.text-muted; }
    RtlText { width:150px; text:root.item.amount-label; font-weight:700; color:root.item.kind-label=="هزینه"?#ff9aaa:#7fd9a4; }
-   VerticalLayout { horizontal-stretch:1; spacing:1px; RtlText{text:root.item.category+" • "+root.item.account-label;font-weight:600;} RtlText{text:root.item.reference.is-empty?root.item.kind-label:root.item.kind-label+" • "+root.item.reference;color:BizTraceTheme.text-faint;font-size:12px;} }
+   VerticalLayout { horizontal-stretch:1; spacing:1px; RtlText{text:root.item.kind-label+" • "+root.item.account-label;font-weight:600;} RtlText{text:root.item.reference.is-empty?root.item.description:root.item.reference+" • "+root.item.description;color:BizTraceTheme.text-faint;font-size:12px;} }
   }
  }
  SelectBox{x:root.width - self.width - 8px;y:(parent.height - self.height)/2;checked:root.item.selected;toggled(v)=>{root.selection-changed(v);}}
@@ -40,7 +40,7 @@ export component FundCheckRow inherits Rectangle {
    if root.item.status-code=="upcoming": IconButton { icon:@image-url("../../assets/icons/x.svg"); label:"لغو"; clicked=>{root.status(3);} }
    RtlText { width:105px; text:root.item.due-on; color:BizTraceTheme.text-muted; }
    RtlText { width:145px; text:root.item.amount-label; font-weight:700; color:root.item.direction-label=="دریافتی"?#7fd9a4:#ff9aaa; }
-   VerticalLayout { horizontal-stretch:1; spacing:1px; RtlText{text:root.item.party-name+" • "+root.item.check-number;font-weight:600;} RtlText{text:root.item.direction-label+" • "+root.item.status-label+" • "+root.item.account-name;color:BizTraceTheme.text-faint;font-size:12px;} }
+   VerticalLayout { horizontal-stretch:1; spacing:1px; RtlText{text:root.item.type-label+" • "+root.item.party-name+(root.item.check-number.is-empty?"":" • "+root.item.check-number);font-weight:600;} RtlText{text:root.item.direction-label+" • "+root.item.status-label+" • "+root.item.account-name;color:BizTraceTheme.text-faint;font-size:12px;} }
   }
  }
  SelectBox{x:root.width - self.width - 8px;y:(parent.height - self.height)/2;checked:root.item.selected;toggled(v)=>{root.selection-changed(v);}}

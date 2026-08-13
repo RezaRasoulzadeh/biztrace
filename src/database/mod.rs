@@ -69,6 +69,10 @@ const MIGRATIONS: &[(i64, &str)] = &[
         12,
         include_str!("../../migrations/0012_default_cash_register.sql"),
     ),
+    (
+        13,
+        include_str!("../../migrations/0013_scheduled_fund_items.sql"),
+    ),
 ];
 
 #[derive(Debug)]
