@@ -1,0 +1,86 @@
+// ui/pages/customer_row.slint
+
+import { IconButton, BizTraceTheme, RtlText, SelectBox } from "../components/mod.slint";
+
+export struct CustomerItemData {
+    id: string,
+    name: string,
+    kind-code: string,
+    kind-label: string,
+    phone: string,
+    email: string,
+    address: string,
+    balance-label: string,
+    balance-status-code: string,
+    selected: bool,
+}
+
+export component CustomerRow inherits Rectangle {
+    in property <CustomerItemData> item;
+    in property <bool> narrow;
+    callback edit;
+    callback remove;
+    callback manage-balance;
+    callback selection-changed(bool);
+    height: 64px;
+    background: transparent;
+
+    card := Rectangle {
+        width: root.width - 72px;
+        height: parent.height;
+        clip: true;
+        background: row-touch.has-hover ? BizTraceTheme.surface-raised : BizTraceTheme.surface;
+        border-color: BizTraceTheme.border;
+        border-width: 1px;
+        border-radius: 8px;
+        animate background { duration: 120ms; }
+        row-touch := TouchArea { mouse-cursor: pointer; }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 14px;
+            spacing: 10px;
+            cross-axis-alignment: center;
+
+            IconButton { icon: @image-url("../../assets/icons/trash-2.svg"); label: "حذف"; danger: true; clicked => { root.remove(); } }
+            IconButton { icon: @image-url("../../assets/icons/pencil.svg"); label: "ویرایش"; clicked => { root.edit(); } }
+            IconButton { icon: @image-url("../../assets/icons/wallet.svg"); label: "مدیریت مانده"; clicked => { root.manage-balance(); } }
+
+            if !root.narrow : RtlText {
+                width: 150px;
+                text: root.item.balance-label;
+                color: root.item.balance-status-code == "debit" ? #ff9aaa :
+                    root.item.balance-status-code == "credit" ? #7fd9a4 : BizTraceTheme.text-muted;
+                font-weight: 600;
+                wrap: no-wrap;
+                overflow: elide;
+            }
+
+            if !root.narrow : RtlText {
+                width: 110px;
+                text: root.item.phone;
+                color: BizTraceTheme.text-muted;
+                wrap: no-wrap;
+                overflow: elide;
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 1px;
+
+                RtlText { text: root.item.name; font-weight: 600; wrap: no-wrap; overflow: elide; }
+                RtlText {
+                    text: root.narrow && !root.item.balance-label.is-empty ?
+                        root.item.kind-label + "  •  " + root.item.balance-label :
+                        root.item.kind-label;
+                    color: root.narrow && root.item.balance-status-code == "debit" ? #ff9aaa :
+                        root.narrow && root.item.balance-status-code == "credit" ? #7fd9a4 :
+                        BizTraceTheme.text-faint;
+                    font-size: 12px;
+                    wrap: no-wrap;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+    SelectBox { x: root.width - self.width - 8px; y: (parent.height - self.height) / 2; checked: root.item.selected; toggled(value) => { root.selection-changed(value); } }
+}

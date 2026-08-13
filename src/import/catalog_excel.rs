@@ -235,8 +235,10 @@ mod tests {
 
     #[test]
     fn catalog_export_can_be_imported_again() {
-        let path =
-            std::env::temp_dir().join(format!("biztrace-catalog-export-{}.xlsx", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "biztrace-catalog-export-{}.xlsx",
+            std::process::id()
+        ));
         write_catalog_export(
             &path,
             &[CatalogRecord {

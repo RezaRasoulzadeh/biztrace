@@ -232,7 +232,7 @@ fn resolved_sku(
             |row| row.get::<_, bool>(0),
         )?;
         if !exists {
-            return Ok(Some(candidate));
+            return Ok(Some(String::from(candidate)));
         }
     }
     Err(DatabaseError::Validation(

@@ -1,0 +1,52 @@
+import { ConfirmDialog, FormattedInput, IconButton, BizTraceIcon, BizTraceTheme, RtlButton, RtlCard, RtlHeading, RtlText, RtlTextField } from "../components/mod.slint";
+
+export component CustomerBalanceEditor inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <string> customer-id;
+    in-out property <string> customer-name;
+    in-out property <string> current-balance;
+    in-out property <int> direction-index;
+    in-out property <string> amount;
+    in-out property <string> note;
+    in property <string> error-message;
+    callback format-amount(string, int) -> FormattedInput;
+    pure callback preview(string, string, int) -> string;
+    callback save(string, int, string, string);
+    callback settle(string);
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+
+    card := RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 18px;
+        width: min(580px, parent.width - 28px);
+        height: min(520px, parent.height - 28px);
+        drop-shadow-color: #99000000;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        animate y { duration: 180ms; easing: ease-out; }
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            HorizontalLayout { height: 38px; spacing: 10px; IconButton { icon: @image-url("../../assets/icons/x.svg"); label: "بستن"; clicked => { root.open = false; } } RtlHeading { horizontal-stretch: 1; text: "ثبت تغییر مانده"; font-size: 20px; } }
+            RtlText { text: root.customer-name; font-weight: 600; font-size: 16px; }
+            Rectangle { height: 58px; background: BizTraceTheme.control; border-radius: 8px; HorizontalLayout { padding: 12px; BizTraceIcon { width: 22px; height: 22px; source: @image-url("../../assets/icons/wallet.svg"); tint: BizTraceTheme.text-muted; } RtlText { horizontal-stretch: 1; text: "مانده فعلی"; color: BizTraceTheme.text-muted; } RtlText { text: root.current-balance; font-weight: 700; } } }
+
+            RtlText { text: "نوع تغییر"; color: BizTraceTheme.text-muted; font-size: 12px; }
+            HorizontalLayout { height: 68px; spacing: 10px;
+                Rectangle { horizontal-stretch: 1; background: root.direction-index == 0 ? #3a2028 : BizTraceTheme.control; border-color: root.direction-index == 0 ? #ff8297 : BizTraceTheme.border; border-width: 1px; border-radius: 9px; HorizontalLayout { padding: 12px; BizTraceIcon { width: 21px; height: 21px; source: @image-url("../../assets/icons/plus.svg"); tint: #ff9aaa; } RtlText { horizontal-stretch: 1; text: "افزودن بدهی"; font-weight: 600; } } TouchArea { mouse-cursor: pointer; clicked => { root.direction-index = 0; } } }
+                Rectangle { horizontal-stretch: 1; background: root.direction-index == 1 ? #173127 : BizTraceTheme.control; border-color: root.direction-index == 1 ? #69d49a : BizTraceTheme.border; border-width: 1px; border-radius: 9px; HorizontalLayout { padding: 12px; BizTraceIcon { width: 21px; height: 21px; source: @image-url("../../assets/icons/minus.svg"); tint: #7fd9a4; } RtlText { horizontal-stretch: 1; text: "افزودن بستانکاری"; font-weight: 600; } } TouchArea { mouse-cursor: pointer; clicked => { root.direction-index = 1; } } }
+            }
+            RtlTextField { label: "مبلغ:"; text <=> root.amount; placeholder-text: "ریال"; numeric-mode: true; format-numeric(value, cursor) => { return root.format-amount(value, cursor); } }
+            RtlTextField { label: "یادداشت:"; text <=> root.note; placeholder-text: "علت تغییر (اختیاری)"; }
+            if !root.amount.is-empty : Rectangle { height: 52px; background: BizTraceTheme.surface-raised; border-radius: 8px; HorizontalLayout { padding: 12px; RtlText { horizontal-stretch: 1; text: "مانده پس از ثبت"; color: BizTraceTheme.text-muted; } RtlText { text: root.preview(root.customer-id, root.amount, root.direction-index); color: root.direction-index == 0 ? #ff9aaa : #7fd9a4; font-weight: 700; } } }
+            if !root.error-message.is-empty : RtlText { height: 24px; text: root.error-message; color: #ff9aaa; font-size: 12px; }
+            Rectangle { vertical-stretch: 1; }
+            HorizontalLayout { height: 40px; spacing: 10px; RtlButton { width: 105px; text: "انصراف"; primary: false; clicked => { root.open = false; } } if root.current-balance != "تسویه" : RtlButton { width: 115px; text: "تسویه"; icon: @image-url("../../assets/icons/circle-slash-2.svg"); primary: false; clicked => { settle-confirm.open = true; } } RtlButton { horizontal-stretch: 1; text: root.direction-index == 0 ? "ثبت بدهی" : "ثبت بستانکاری"; icon: @image-url("../../assets/icons/check.svg"); clicked => { root.save(root.customer-id, root.direction-index, root.amount, root.note); } } }
+        }
+    }
+    settle-confirm := ConfirmDialog { width: parent.width; height: parent.height; title: "تسویه مانده"; message: "مانده حساب «" + root.customer-name + "» صفر شود؟"; confirm-text: "تسویه"; confirmed => { root.settle(root.customer-id); } }
+}

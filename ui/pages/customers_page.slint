@@ -1,22 +1,134 @@
-// ui/pages/customers_page.slint
-
-import { EmptyState, PageHeader } from "../components/mod.slint";
+import { ConfirmDialog, EmptyState, FormattedInput, BizTraceIcon, BizTraceTheme, RtlButton, RtlHeading, RtlLineEdit, RtlSelect, RtlTableHeaderCell, RtlText, SelectBox, TipRow } from "../components/mod.slint";
 import { ScrollView } from "std-widgets.slint";
+import { CustomerEditor } from "customer_editor.slint";
+import { CustomerBalanceEditor } from "customer_balance_editor.slint";
+import { CustomerItemData, CustomerRow } from "customer_row.slint";
 
 export component CustomersPage inherits Rectangle {
     in property <bool> narrow;
-    in property <int> item-count;
-    callback create;
+    in property <[CustomerItemData]> items;
+    in-out property <string> search-text;
+    in-out property <int> sort-index;
+    in-out property <bool> editor-open;
+    in property <string> editor-error;
+    in-out property <bool> balance-editor-open;
+    in property <string> balance-editor-error;
+    in property <int> selected-count;
+    property <string> pending-remove-id;
+    property <string> pending-remove-name;
+    callback search(string);
+    callback sort-changed(int);
+    callback save(string, string, string, string, string, int);
+    callback format-balance(string, int) -> FormattedInput;
+    pure callback balance-preview(string, string, int) -> string;
+    callback adjust-balance(string, int, string, string);
+    callback remove(string);
+    callback settle-balance(string);
+    callback download-template;
+    callback import-excel;
+    callback selection-changed(string, bool);
+    callback select-all;
+    callback clear-selection;
+    callback export-all;
+    callback export-selected;
     background: transparent;
+    property <bool> show-tips: root.width >= 1050px;
+    property <length> tips-width: 310px;
+    property <length> content-width: root.width - (root.show-tips ? root.tips-width : 0px);
+    property <bool> compact-content: root.narrow || root.content-width < 780px;
+    property <bool> all-visible-selected;
 
     ScrollView {
-        width: parent.width;
+        x: root.show-tips ? root.tips-width : 0px;
+        width: root.content-width;
         height: parent.height;
         VerticalLayout {
-            padding: root.narrow ? 14px : 28px;
-            spacing: 18px;
-            PageHeader { title: "مشتریان"; description: "اشخاص و کسب‌وکارهای طرف حساب"; action-text: "مشتری جدید"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); narrow: root.narrow; action => { root.create(); } }
-            EmptyState { icon: @image-url("../../assets/icons/user-round-plus.svg"); title: "هنوز مشتری ثبت نشده"; description: "مشتریان حقیقی یا حقوقی را اینجا اضافه کنید."; action-text: "افزودن مشتری"; action-icon: @image-url("../../assets/icons/user-round-plus.svg"); action => { root.create(); } }
+            padding: root.compact-content ? 14px : 28px;
+            spacing: 14px;
+            alignment: start;
+
+            RtlHeading { text: "مشتریان"; }
+            RtlText { text: "مدیریت اشخاص و کسب‌وکارهای طرف حساب و مانده آن‌ها"; color: BizTraceTheme.text-muted; }
+
+            HorizontalLayout {
+                height: 40px;
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 135px; text: "خروجی همه"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-all(); } }
+                RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 135px; text: "فایل نمونه"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.download-template(); } }
+                RtlButton { width: root.compact-content ? (root.content-width - 52px) / 4 : 135px; text: "ورود اکسل"; icon: @image-url("../../assets/icons/file-spreadsheet.svg"); primary: false; clicked => { root.import-excel(); } }
+                RtlButton {
+                    width: root.compact-content ? (root.content-width - 52px) / 4 : 160px;
+                    text: "افزودن";
+                    icon: @image-url("../../assets/icons/user-round-plus.svg");
+                    clicked => {
+                        editor.customer-id = "";
+                        editor.customer-name = "";
+                        editor.phone = "";
+                        editor.email = "";
+                        editor.address = "";
+                        editor.kind-index = 0;
+                        root.editor-open = true;
+                    }
+                }
+            }
+
+            if root.selected-count > 0 : HorizontalLayout { height: 38px; spacing: 8px; RtlText { horizontal-stretch: 1; text: root.selected-count + " انتخاب‌شده"; color: BizTraceTheme.text-muted; } RtlButton { width: 150px; text: "خروجی انتخاب"; icon: @image-url("../../assets/icons/download.svg"); primary: false; clicked => { root.export-selected(); } } RtlButton { width: 130px; text: "لغو انتخاب"; primary: false; clicked => { root.all-visible-selected = false; root.clear-selection(); } } }
+
+            HorizontalLayout {
+                height: 40px;
+                spacing: 8px;
+                RtlText { width: root.compact-content ? 58px : 72px; text: root.items.length + " مورد"; color: BizTraceTheme.text-muted; font-size: 12px; }
+                RtlSelect { width: root.compact-content ? 120px : 190px; model: ["جدیدترین", "نام: الف تا ی", "نام: ی تا الف", "بیشترین بدهی", "بیشترین بستانکاری"]; current-index <=> root.sort-index; selected(value) => { root.sort-changed(root.sort-index); } }
+                RtlLineEdit { horizontal-stretch: 1; text <=> root.search-text; placeholder-text: "جستجو با نام، تلفن یا ایمیل"; edited(value) => { root.search(value); } }
+            }
+
+            if root.items.length == 0 : EmptyState {
+                icon: @image-url("../../assets/icons/user-round-plus.svg");
+                title: root.search-text.is-empty ? "هنوز مشتری ثبت نشده" : "نتیجه‌ای پیدا نشد";
+                description: root.search-text.is-empty ? "مشتریان حقیقی یا حقوقی را اینجا اضافه کنید." : "نام، تلفن یا ایمیل دیگری را جستجو کنید.";
+                action-text: root.search-text.is-empty ? "افزودن مشتری" : "پاک کردن جستجو";
+                action-icon: root.search-text.is-empty ? @image-url("../../assets/icons/user-round-plus.svg") : @image-url("../../assets/icons/search-x.svg");
+                action => {
+                    if root.search-text.is-empty {
+                        editor.customer-id = ""; editor.customer-name = ""; editor.phone = ""; editor.email = ""; editor.address = "";
+                        editor.kind-index = 0;
+                        root.editor-open = true;
+                    } else { root.search-text = ""; root.search(""); }
+                }
+            }
+
+            if root.items.length > 0 : Rectangle {
+                height: 30px;
+                HorizontalLayout { width: parent.width - 72px; padding-left: 10px; padding-right: 14px; spacing: 10px;
+                    RtlTableHeaderCell { width: 112px; text: "عملیات"; }
+                    if !root.compact-content : RtlTableHeaderCell { width: 150px; text: "مانده حساب"; }
+                    if !root.compact-content : RtlTableHeaderCell { width: 110px; text: "تلفن"; }
+                    RtlTableHeaderCell { horizontal-stretch: 1; text: "نام و نوع"; }
+                }
+                SelectBox { x: parent.width - self.width - 8px; y: 3px; checked: root.all-visible-selected; toggled(value) => { root.all-visible-selected = value; if value { root.select-all(); } else { root.clear-selection(); } } }
+            }
+
+            for item in root.items : CustomerRow {
+                item: item;
+                narrow: root.compact-content;
+                edit => {
+                    editor.customer-id = item.id; editor.customer-name = item.name; editor.phone = item.phone; editor.email = item.email; editor.address = item.address;
+                    editor.kind-index = item.kind-code == "individual" ? 0 : 1;
+                    root.editor-open = true;
+                }
+                remove => { root.pending-remove-id = item.id; root.pending-remove-name = item.name; confirm.open = true; }
+                manage-balance => {
+                    balance-editor.customer-id = item.id; balance-editor.customer-name = item.name; balance-editor.current-balance = item.balance-label; balance-editor.direction-index = item.balance-status-code == "credit" ? 1 : 0; balance-editor.amount = ""; balance-editor.note = ""; root.balance-editor-open = true;
+                }
+                selection-changed(value) => { if !value { root.all-visible-selected = false; } root.selection-changed(item.id, value); }
+            }
         }
     }
+
+    Rectangle { x: root.show-tips ? 0px : -root.tips-width; width: root.tips-width; height: parent.height; background: BizTraceTheme.surface; visible: root.show-tips; Rectangle { x: parent.width - 3px; width: 3px; height: parent.height; background: BizTraceTheme.brand; } VerticalLayout { padding: 22px; padding-top: 28px; spacing: 6px; HorizontalLayout { height: 46px; Rectangle { horizontal-stretch: 1; } RtlHeading { text: "ورود گروهی مشتریان"; font-size: 18px; } Rectangle { width: 42px; height: 42px; background: BizTraceTheme.brand; border-radius: 21px; BizTraceIcon { x: 10px; y: 10px; width: 21px; height: 21px; source: @image-url("../../assets/icons/file-spreadsheet.svg"); tint: white; } } } RtlText { height: 38px; text: "مشتریان و مانده اولیه آن‌ها را یکجا ثبت کنید."; color: BizTraceTheme.text-muted; font-size: 12px; } TipRow { icon: @image-url("../../assets/icons/download.svg"); text: "فایل نمونه را دریافت و تکمیل کنید."; } TipRow { icon: @image-url("../../assets/icons/contact.svg"); text: "نوع مشتری، اطلاعات تماس و آدرس قابل ورود است."; } TipRow { icon: @image-url("../../assets/icons/dollar-sign.svg"); text: "مانده اولیه بدهکار، بستانکار یا تسویه قابل ورود است."; } TipRow { icon: @image-url("../../assets/icons/upload.svg"); text: "فایل را وارد کنید؛ ردیف‌های نامعتبر نادیده گرفته می‌شوند."; } Rectangle { vertical-stretch: 1; } } }
+
+    editor := CustomerEditor { width: parent.width; height: parent.height; open <=> root.editor-open; error-message: root.editor-error; save(id, name, phone, email, address, kind) => { root.save(id, name, phone, email, address, kind); } }
+    balance-editor := CustomerBalanceEditor { width: parent.width; height: parent.height; open <=> root.balance-editor-open; error-message: root.balance-editor-error; format-amount(value, cursor) => { return root.format-balance(value, cursor); } preview(id, amount, direction) => { return root.balance-preview(id, amount, direction); } save(id, direction, amount, note) => { root.adjust-balance(id, direction, amount, note); } settle(id) => { root.settle-balance(id); root.balance-editor-open = false; } }
+    confirm := ConfirmDialog { width: parent.width; height: parent.height; title: "حذف مشتری"; message: "«" + root.pending-remove-name + "» حذف شود؟"; confirm-text: "حذف"; confirmed => { root.remove(root.pending-remove-id); } }
 }

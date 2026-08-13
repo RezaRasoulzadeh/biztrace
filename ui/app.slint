@@ -4,9 +4,13 @@ import { FormattedInput, BizTraceTheme, RtlSidebar, RtlToast, RtlTopNav, SearchO
 import {
     CatalogPage,
     CatalogItemData,
+    CustomerItemData,
     CustomersPage,
     DashboardPage,
     FundsPage,
+    FundAccountData,
+    FundTransactionData,
+    FundCheckData,
     InventoryPage,
     InvoicesPage,
     MovementItemData,
@@ -42,6 +46,45 @@ export component AppWindow inherits Window {
     in-out property <bool> catalog-editor-open;
     in-out property <string> catalog-editor-error;
     in-out property <bool> notification-open;
+    in property <[CustomerItemData]> customer-items;
+    in-out property <string> customer-search-text;
+    in-out property <int> customer-sort-index;
+    in-out property <bool> customer-editor-open;
+    in-out property <string> customer-editor-error;
+    in-out property <bool> customer-balance-editor-open;
+    in-out property <string> customer-balance-editor-error;
+    in property <int> customer-selected-count;
+    callback customer-search(string);
+    callback customer-sort-changed(int);
+    callback customer-save(string, string, string, string, string, int);
+    callback customer-format-balance(string, int) -> FormattedInput;
+    pure callback customer-balance-preview(string, string, int) -> string;
+    callback customer-adjust-balance(string, int, string, string);
+    callback customer-remove(string);
+    callback customer-settle-balance(string);
+    callback customer-download-template;
+    callback customer-import-excel;
+    callback customer-selection-changed(string, bool);
+    callback customer-select-all;
+    callback customer-clear-selection;
+    callback customer-export-all;
+    callback customer-export-selected;
+    in property <[FundAccountData]> fund-accounts;
+    in property <[FundTransactionData]> fund-transactions;
+    in property <[FundCheckData]> fund-checks;
+    in property <[string]> fund-account-names;
+    in-out property <string> fund-search-text;
+    in-out property <bool> fund-account-editor-open;
+    in-out property <bool> fund-transaction-editor-open;
+    in-out property <bool> fund-check-editor-open;
+    in-out property <string> fund-editor-error;
+    callback fund-save-account(string,string,string,int,string);
+    callback fund-remove-account(string);
+    callback fund-save-transaction(int,int,int,string,string,string,string,string);
+    callback fund-remove-transaction(string);
+    callback fund-save-check(int,int,string,string,string,string,string,string);
+    callback fund-check-status(string,int);
+    callback fund-search(string);
     callback catalog-search(string);
     callback catalog-save(string, string, string, int, int, string);
     callback catalog-format-price(string, int) -> FormattedInput;
@@ -159,11 +202,29 @@ export component AppWindow inherits Window {
         width: root.workspace-width;
         height: parent.height - top-nav.height;
         narrow: root.narrow-content;
-        item-count: root.customer-count;
-        create => {
-            root.status-message = "فرم ثبت مشتری در مرحله بعد اضافه می‌شود";
-            toast.open = true;
-        }
+        items: root.customer-items;
+        search-text <=> root.customer-search-text;
+        sort-index <=> root.customer-sort-index;
+        editor-open <=> root.customer-editor-open;
+        editor-error: root.customer-editor-error;
+        balance-editor-open <=> root.customer-balance-editor-open;
+        balance-editor-error: root.customer-balance-editor-error;
+        selected-count: root.customer-selected-count;
+        search(value) => { root.customer-search(value); }
+        sort-changed(index) => { root.customer-sort-changed(index); }
+        save(id, name, phone, email, address, kind) => { root.customer-save(id, name, phone, email, address, kind); }
+        format-balance(value, cursor) => { return root.customer-format-balance(value, cursor); }
+        balance-preview(id, amount, direction) => { return root.customer-balance-preview(id, amount, direction); }
+        adjust-balance(id, direction, amount, note) => { root.customer-adjust-balance(id, direction, amount, note); }
+        remove(id) => { root.customer-remove(id); }
+        settle-balance(id) => { root.customer-settle-balance(id); }
+        download-template => { root.customer-download-template(); }
+        import-excel => { root.customer-import-excel(); }
+        selection-changed(id, selected) => { root.customer-selection-changed(id, selected); }
+        select-all => { root.customer-select-all(); }
+        clear-selection => { root.customer-clear-selection(); }
+        export-all => { root.customer-export-all(); }
+        export-selected => { root.customer-export-selected(); }
     }
 
     if root.navigation-index == 4 : InventoryPage {
@@ -216,11 +277,8 @@ export component AppWindow inherits Window {
         width: root.workspace-width;
         height: parent.height - top-nav.height;
         narrow: root.narrow-content;
-        account-count: root.fund-account-count;
-        create => {
-            root.status-message = "فرم ایجاد حساب مالی در مرحله بعد اضافه می‌شود";
-            toast.open = true;
-        }
+        accounts:root.fund-accounts;transactions:root.fund-transactions;checks:root.fund-checks;account-names:root.fund-account-names;search-text<=>root.fund-search-text;account-editor-open<=>root.fund-account-editor-open;transaction-editor-open<=>root.fund-transaction-editor-open;check-editor-open<=>root.fund-check-editor-open;editor-error:root.fund-editor-error;
+        format-amount(v,c)=>{return root.customer-format-balance(v,c);} search(v)=>{root.fund-search(v);} save-account(id,name,number,kind,balance)=>{root.fund-save-account(id,name,number,kind,balance);} remove-account(id)=>{root.fund-remove-account(id);} save-transaction(kind,account,target,amount,category,date,reference,description)=>{root.fund-save-transaction(kind,account,target,amount,category,date,reference,description);} remove-transaction(id)=>{root.fund-remove-transaction(id);} save-check(direction,account,party,number,bank,amount,due,note)=>{root.fund-save-check(direction,account,party,number,bank,amount,due,note);} check-status(id,status)=>{root.fund-check-status(id,status);}
     }
 
     if root.navigation-index == 6 : UsersPage {

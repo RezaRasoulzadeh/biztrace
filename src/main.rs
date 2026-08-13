@@ -5,12 +5,14 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use biztrace::database::{
-    CatalogDraft, CatalogRecord, Database, DatabaseError, InventoryMovementDraft, MovementRecord,
-    StockRecord, WarehouseRecord,
+    CatalogDraft, CatalogRecord, CustomerDraft, CustomerRecord, Database, DatabaseError,
+    FundAccountDraft, FundAccountRecord, FundCheckDraft, FundCheckRecord, FundTransactionDraft,
+    FundTransactionRecord, InventoryMovementDraft, MovementRecord, StockRecord, WarehouseRecord,
 };
 use biztrace::import::{
-    read_catalog_excel, read_inventory_excel, write_catalog_export, write_catalog_template,
-    write_inventory_export, write_inventory_template,
+    read_catalog_excel, read_customer_excel, read_inventory_excel, write_catalog_export,
+    write_catalog_template, write_customer_export, write_customer_template, write_inventory_export,
+    write_inventory_template,
 };
 use rfd::AsyncFileDialog;
 use slint::{ModelRc, SharedString, VecModel};
@@ -22,6 +24,8 @@ thread_local! {
     static INVENTORY_SELECTION: RefCell<HashSet<i64>> = RefCell::new(HashSet::new());
     static CATALOG_SORT: Cell<i32> = const { Cell::new(0) };
     static INVENTORY_SORT: Cell<i32> = const { Cell::new(0) };
+    static CUSTOMER_SORT: Cell<i32> = const { Cell::new(0) };
+    static CUSTOMER_SELECTION: RefCell<HashSet<i64>> = RefCell::new(HashSet::new());
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,9 +40,475 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.set_transaction_count(counts.fund_transactions);
     app.set_user_count(counts.users);
     app.set_catalog_items(catalog_model(database.catalog_items("")?));
+    app.set_customer_items(customer_model(database.customers("")?));
     refresh_inventory(&app, &database, "")?;
+    refresh_funds(&app, &database, "")?;
 
     app.on_catalog_format_price(format_price_input);
+    app.on_customer_format_balance(format_price_input);
+
+    let weak = app.as_weak();
+    let fund_search_db = Rc::clone(&database);
+    app.on_fund_search(move |search| {
+        if let Some(app) = weak.upgrade() {
+            let _ = refresh_funds(&app, &fund_search_db, &search);
+        }
+    });
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_save_account(move |id, name, number, kind, balance| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_fund_editor_error("".into());
+        let Some(balance) = parse_amount(&balance) else {
+            app.set_fund_editor_error("موجودی افتتاحیه معتبر نیست".into());
+            return;
+        };
+        let draft = FundAccountDraft {
+            id: if id.is_empty() { None } else { id.parse().ok() },
+            kind: match kind {
+                0 => "cash",
+                1 => "bank",
+                2 => "card",
+                _ => "other",
+            }
+            .into(),
+            name: name.trim().into(),
+            account_number: (!number.trim().is_empty()).then(|| number.trim().into()),
+            opening_balance_minor: balance,
+        };
+        match fund_db.save_fund_account(&draft) {
+            Ok(_) => {
+                let _ = refresh_funds(&app, &fund_db, "");
+                app.set_fund_account_editor_open(false);
+                app.set_status_message("حساب مالی ذخیره شد".into());
+                app.set_notification_open(true);
+            }
+            Err(_) => app.set_fund_editor_error("اطلاعات حساب کامل یا معتبر نیست".into()),
+        }
+    });
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_remove_account(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            match fund_db.remove_fund_account(id) {
+                Ok(_) => {
+                    let _ = refresh_funds(&app, &fund_db, "");
+                    app.set_status_message("حساب حذف شد".into());
+                }
+                Err(_) => {
+                    app.set_status_message("حساب دارای سابقه مالی است و قابل حذف نیست".into())
+                }
+            }
+            app.set_notification_open(true);
+        }
+    });
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_save_transaction(
+        move |kind, account, target, amount, category, date, reference, description| {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_fund_editor_error("".into());
+            let Ok(accounts) = fund_db.fund_accounts() else {
+                return;
+            };
+            let Some(source) = accounts.get(account as usize) else {
+                app.set_fund_editor_error("ابتدا یک حساب مالی بسازید".into());
+                return;
+            };
+            let target_id = if kind == 2 {
+                accounts.get(target as usize).map(|a| a.id)
+            } else {
+                None
+            };
+            let Some(amount) = parse_amount(&amount).filter(|v| *v > 0) else {
+                app.set_fund_editor_error("مبلغ معتبر وارد کنید".into());
+                return;
+            };
+            let draft = FundTransactionDraft {
+                account_id: source.id,
+                transfer_account_id: target_id,
+                kind: match kind {
+                    0 => "income",
+                    1 => "expense",
+                    _ => "transfer",
+                }
+                .into(),
+                amount_minor: amount,
+                category: category.trim().into(),
+                occurred_on: date.trim().into(),
+                reference: (!reference.trim().is_empty()).then(|| reference.trim().into()),
+                description: (!description.trim().is_empty()).then(|| description.trim().into()),
+            };
+            match fund_db.save_fund_transaction(&draft) {
+                Ok(_) => {
+                    let _ = refresh_funds(&app, &fund_db, "");
+                    app.set_fund_transaction_editor_open(false);
+                    app.set_status_message("تراکنش ثبت شد".into());
+                    app.set_notification_open(true);
+                }
+                Err(_) => app.set_fund_editor_error(
+                    "اطلاعات تراکنش، تاریخ یا شناسه پیگیری معتبر نیست".into(),
+                ),
+            }
+        },
+    );
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_remove_transaction(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            let _ = fund_db.remove_fund_transaction(id);
+            let _ = refresh_funds(&app, &fund_db, &app.get_fund_search_text());
+        }
+    });
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_save_check(
+        move |direction, account, party, number, bank, amount, due, note| {
+            let Some(app) = weak.upgrade() else { return };
+            app.set_fund_editor_error("".into());
+            let Ok(accounts) = fund_db.fund_accounts() else {
+                return;
+            };
+            let Some(account) = accounts.get(account as usize) else {
+                app.set_fund_editor_error("ابتدا یک حساب مالی بسازید".into());
+                return;
+            };
+            let Some(amount) = parse_amount(&amount).filter(|v| *v > 0) else {
+                app.set_fund_editor_error("مبلغ معتبر وارد کنید".into());
+                return;
+            };
+            let draft = FundCheckDraft {
+                direction: if direction == 0 {
+                    "incoming"
+                } else {
+                    "outgoing"
+                }
+                .into(),
+                account_id: account.id,
+                party_name: party.trim().into(),
+                check_number: number.trim().into(),
+                bank_name: (!bank.trim().is_empty()).then(|| bank.trim().into()),
+                amount_minor: amount,
+                due_on: due.trim().into(),
+                note: (!note.trim().is_empty()).then(|| note.trim().into()),
+            };
+            match fund_db.save_fund_check(&draft) {
+                Ok(_) => {
+                    let _ = refresh_funds(&app, &fund_db, "");
+                    app.set_fund_check_editor_open(false);
+                    app.set_status_message("چک ثبت شد".into());
+                    app.set_notification_open(true);
+                }
+                Err(_) => app.set_fund_editor_error("اطلاعات چک یا شماره آن معتبر نیست".into()),
+            }
+        },
+    );
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_check_status(move |id, status| {
+        let Some(app) = weak.upgrade() else { return };
+        let code = match status {
+            1 => "cleared",
+            2 => "returned",
+            _ => "cancelled",
+        };
+        if let Ok(id) = id.parse() {
+            let _ = fund_db.set_fund_check_status(id, code);
+            let _ = refresh_funds(&app, &fund_db, &app.get_fund_search_text());
+        }
+    });
+
+    let weak = app.as_weak();
+    let customer_search_database = Rc::clone(&database);
+    app.on_customer_search(move |search| {
+        if let (Some(app), Ok(records)) =
+            (weak.upgrade(), customer_search_database.customers(&search))
+        {
+            app.set_customer_items(customer_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let customer_sort_database = Rc::clone(&database);
+    app.on_customer_sort_changed(move |index| {
+        CUSTOMER_SORT.with(|sort| sort.set(index));
+        if let Some(app) = weak.upgrade()
+            && let Ok(records) = customer_sort_database.customers(&app.get_customer_search_text())
+        {
+            app.set_customer_items(customer_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    let customer_save_database = Rc::clone(&database);
+    app.on_customer_save(move |id, name, phone, email, address, kind_index| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_customer_editor_error("".into());
+        let name = name.trim();
+        if name.is_empty() {
+            app.set_customer_editor_error("نام مشتری را وارد کنید".into());
+            return;
+        }
+        let draft = CustomerDraft {
+            id: if id.is_empty() { None } else { id.parse().ok() },
+            kind: if kind_index == 0 {
+                "individual"
+            } else {
+                "business"
+            }
+            .into(),
+            name: name.into(),
+            phone: (!phone.trim().is_empty()).then(|| phone.trim().to_owned()),
+            email: (!email.trim().is_empty()).then(|| email.trim().to_owned()),
+            address: (!address.trim().is_empty()).then(|| address.trim().to_owned()),
+        };
+        match customer_save_database.save_customer(&draft) {
+            Ok(_) => {
+                if let Ok(records) =
+                    customer_save_database.customers(&app.get_customer_search_text())
+                {
+                    app.set_customer_items(customer_model(records));
+                }
+                if let Ok(records) = customer_save_database.customers("") {
+                    app.set_customer_count(records.len() as i32);
+                }
+                app.set_customer_editor_open(false);
+                app.set_status_message("مشتری با موفقیت ذخیره شد".into());
+                app.set_notification_open(true);
+            }
+            Err(_) => app.set_customer_editor_error("ذخیره مشتری انجام نشد".into()),
+        }
+    });
+
+    let preview_database = Rc::clone(&database);
+    app.on_customer_balance_preview(move |id, amount, direction| {
+        let Some(id) = id.parse().ok() else {
+            return "—".into();
+        };
+        let Some(amount) = parse_amount(&amount) else {
+            return "—".into();
+        };
+        let Ok(Some(customer)) = preview_database.customer(id) else {
+            return "—".into();
+        };
+        let change = if direction == 0 { amount } else { -amount };
+        let Some(balance) = customer.balance_minor.checked_add(change) else {
+            return "—".into();
+        };
+        balance_label(balance)
+    });
+
+    let weak = app.as_weak();
+    let adjustment_database = Rc::clone(&database);
+    app.on_customer_adjust_balance(move |id, direction, amount, note| {
+        let Some(app) = weak.upgrade() else { return };
+        app.set_customer_balance_editor_error("".into());
+        let Some(id) = id.parse().ok() else { return };
+        let Some(amount) = parse_amount(&amount).filter(|amount| *amount > 0) else {
+            app.set_customer_balance_editor_error("مبلغی بزرگ‌تر از صفر وارد کنید".into());
+            return;
+        };
+        let signed = if direction == 0 { amount } else { -amount };
+        match adjustment_database.adjust_customer_balance(
+            id,
+            signed,
+            (!note.trim().is_empty()).then_some(note.trim()),
+        ) {
+            Ok(_) => {
+                if let Ok(records) = adjustment_database.customers(&app.get_customer_search_text())
+                {
+                    app.set_customer_items(customer_model(records));
+                }
+                app.set_customer_balance_editor_open(false);
+                app.set_status_message(if direction == 0 {
+                    "بدهی مشتری ثبت شد".into()
+                } else {
+                    "بستانکاری مشتری ثبت شد".into()
+                });
+                app.set_notification_open(true);
+            }
+            Err(_) => app.set_customer_balance_editor_error("ثبت تغییر مانده انجام نشد".into()),
+        }
+    });
+
+    let weak = app.as_weak();
+    let customer_remove_database = Rc::clone(&database);
+    app.on_customer_remove(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(id) = id.parse().ok() else { return };
+        match customer_remove_database.remove_customer(id) {
+            Ok(()) => {
+                if let Ok(records) =
+                    customer_remove_database.customers(&app.get_customer_search_text())
+                {
+                    app.set_customer_items(customer_model(records));
+                }
+                if let Ok(records) = customer_remove_database.customers("") {
+                    app.set_customer_count(records.len() as i32);
+                }
+                app.set_status_message("مشتری حذف شد".into());
+            }
+            Err(DatabaseError::Validation(_)) => {
+                app.set_status_message("این مشتری در فاکتورها استفاده شده و قابل حذف نیست".into())
+            }
+            Err(_) => app.set_status_message("حذف مشتری انجام نشد".into()),
+        }
+        app.set_notification_open(true);
+    });
+
+    let weak = app.as_weak();
+    let customer_settle_database = Rc::clone(&database);
+    app.on_customer_settle_balance(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        let Some(id) = id.parse().ok() else { return };
+        if customer_settle_database.settle_customer_balance(id).is_ok() {
+            if let Ok(records) = customer_settle_database.customers(&app.get_customer_search_text())
+            {
+                app.set_customer_items(customer_model(records));
+            }
+            app.set_status_message("مانده حساب مشتری تسویه شد".into());
+            app.set_notification_open(true);
+        }
+    });
+
+    let weak = app.as_weak();
+    let customer_selection_database = Rc::clone(&database);
+    app.on_customer_selection_changed(move |id, selected| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            CUSTOMER_SELECTION.with(|items| {
+                if selected {
+                    items.borrow_mut().insert(id);
+                } else {
+                    items.borrow_mut().remove(&id);
+                }
+                app.set_customer_selected_count(items.borrow().len() as i32);
+            });
+        }
+        if let Ok(records) = customer_selection_database.customers(&app.get_customer_search_text())
+        {
+            app.set_customer_items(customer_model(records));
+        }
+    });
+    let weak = app.as_weak();
+    let customer_select_database = Rc::clone(&database);
+    app.on_customer_select_all(move || {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(records) = customer_select_database.customers(&app.get_customer_search_text()) {
+            CUSTOMER_SELECTION.with(|items| {
+                items
+                    .borrow_mut()
+                    .extend(records.iter().map(|item| item.id));
+                app.set_customer_selected_count(items.borrow().len() as i32);
+            });
+            app.set_customer_items(customer_model(records));
+        }
+    });
+    let weak = app.as_weak();
+    let customer_clear_database = Rc::clone(&database);
+    app.on_customer_clear_selection(move || {
+        let Some(app) = weak.upgrade() else { return };
+        CUSTOMER_SELECTION.with(|items| items.borrow_mut().clear());
+        app.set_customer_selected_count(0);
+        if let Ok(records) = customer_clear_database.customers(&app.get_customer_search_text()) {
+            app.set_customer_items(customer_model(records));
+        }
+    });
+
+    let weak = app.as_weak();
+    app.on_customer_download_template(move || {
+        let weak = weak.clone();
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("ذخیره فایل نمونه مشتریان")
+                .set_file_name("biztrace-customers-template.xlsx")
+                .add_filter("Excel", &["xlsx"])
+                .save_file()
+                .await
+            else {
+                return;
+            };
+            let Some(app) = weak.upgrade() else { return };
+            match safe_excel_write(|| write_customer_template(&xlsx_path(file.path()))) {
+                Ok(()) => app.set_status_message("فایل نمونه مشتریان ذخیره شد".into()),
+                Err(error) => {
+                    app.set_status_message(format!("ذخیره فایل انجام نشد: {error}").into())
+                }
+            }
+            app.set_notification_open(true);
+        });
+    });
+
+    let weak = app.as_weak();
+    let customer_import_database = Rc::clone(&database);
+    app.on_customer_import_excel(move || {
+        let weak = weak.clone();
+        let database = Rc::clone(&customer_import_database);
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("انتخاب فایل مشتریان")
+                .add_filter("Excel", &["xlsx", "xlsb", "xls", "ods"])
+                .pick_file()
+                .await
+            else {
+                return;
+            };
+            let result = read_customer_excel(file.path()).and_then(|file| {
+                let mut inserted = 0;
+                for row in &file.rows {
+                    let id = database
+                        .save_customer(&row.customer)
+                        .map_err(|error| error.to_string())?;
+                    if row.opening_balance_minor != 0 {
+                        database
+                            .adjust_customer_balance(
+                                id,
+                                row.opening_balance_minor,
+                                Some("مانده اولیه ورود گروهی"),
+                            )
+                            .map_err(|error| error.to_string())?;
+                    }
+                    inserted += 1;
+                }
+                Ok((inserted, file.errors.len()))
+            });
+            let Some(app) = weak.upgrade() else { return };
+            match result {
+                Ok((inserted, invalid)) => {
+                    if let Ok(records) = database.customers("") {
+                        app.set_customer_count(records.len() as i32);
+                        app.set_customer_items(customer_model(records));
+                    }
+                    app.set_customer_search_text("".into());
+                    app.set_status_message(
+                        format!("{inserted} مشتری وارد شد؛ {invalid} ردیف نامعتبر نادیده گرفته شد")
+                            .into(),
+                    );
+                }
+                Err(error) => {
+                    app.set_status_message(format!("ورود مشتریان انجام نشد: {error}").into())
+                }
+            }
+            app.set_notification_open(true);
+        });
+    });
+
+    let weak = app.as_weak();
+    let customer_export_database = Rc::clone(&database);
+    app.on_customer_export_all(move || {
+        if let Some(app) = weak.upgrade() {
+            export_customers(&app, &customer_export_database, false);
+        }
+    });
+    let weak = app.as_weak();
+    let customer_export_database = Rc::clone(&database);
+    app.on_customer_export_selected(move || {
+        if let Some(app) = weak.upgrade() {
+            export_customers(&app, &customer_export_database, true);
+        }
+    });
 
     let weak = app.as_weak();
     let search_database = Rc::clone(&database);
@@ -775,6 +1245,41 @@ fn export_catalog(app: &AppWindow, database: &Database, selected_only: bool) {
     });
 }
 
+fn export_customers(app: &AppWindow, database: &Database, selected_only: bool) {
+    let Ok(mut records) = database.customers("") else {
+        return;
+    };
+    if selected_only {
+        CUSTOMER_SELECTION.with(|items| records.retain(|item| items.borrow().contains(&item.id)));
+        if records.is_empty() {
+            app.set_status_message("مشتری‌ای برای خروجی انتخاب نشده است".into());
+            app.set_notification_open(true);
+            return;
+        }
+    }
+    let weak = app.as_weak();
+    let _ = slint::spawn_local(async move {
+        let Some(file) = AsyncFileDialog::new()
+            .set_title("ذخیره خروجی مشتریان")
+            .set_file_name("biztrace-customers-export.xlsx")
+            .add_filter("Excel", &["xlsx"])
+            .save_file()
+            .await
+        else {
+            return;
+        };
+        let path = xlsx_path(file.path());
+        let Some(app) = weak.upgrade() else { return };
+        match safe_excel_write(|| write_customer_export(&path, &records)) {
+            Ok(()) => {
+                app.set_status_message(format!("خروجی {} مشتری ذخیره شد", records.len()).into())
+            }
+            Err(error) => app.set_status_message(format!("خروجی ذخیره نشد: {error}").into()),
+        }
+        app.set_notification_open(true);
+    });
+}
+
 fn export_inventory(app: &AppWindow, database: &Database, selected_only: bool) {
     let Ok(mut records) = database.stock_records("") else {
         return;
@@ -859,6 +1364,137 @@ fn catalog_model(mut records: Vec<CatalogRecord>) -> ModelRc<CatalogItemData> {
     ModelRc::new(VecModel::from(rows))
 }
 
+fn refresh_funds(app: &AppWindow, database: &Database, search: &str) -> Result<(), DatabaseError> {
+    let accounts = database.fund_accounts()?;
+    app.set_fund_account_names(string_model(
+        accounts.iter().map(|a| a.name.clone()).collect(),
+    ));
+    app.set_fund_accounts(ModelRc::new(VecModel::from(
+        accounts
+            .iter()
+            .map(|a| FundAccountData {
+                id: a.id.to_string().into(),
+                name: a.name.clone().into(),
+                kind_label: match a.kind.as_str() {
+                    "cash" => "صندوق نقدی",
+                    "bank" => "حساب بانکی",
+                    "card" => "کارت",
+                    _ => "سایر",
+                }
+                .into(),
+                account_number: a.account_number.clone().into(),
+                opening_value: format_number(a.opening_balance_minor).into(),
+                balance_label: format_amount(a.balance_minor),
+            })
+            .collect::<Vec<_>>(),
+    )));
+    let transactions = database.fund_transactions(search)?;
+    app.set_fund_transactions(fund_transaction_model(transactions));
+    let checks = database.fund_checks(search)?;
+    app.set_fund_checks(fund_check_model(checks));
+    app.set_fund_account_count(accounts.len() as i32);
+    Ok(())
+}
+fn fund_transaction_model(records: Vec<FundTransactionRecord>) -> ModelRc<FundTransactionData> {
+    ModelRc::new(VecModel::from(
+        records
+            .into_iter()
+            .map(|r| FundTransactionData {
+                id: r.id.to_string().into(),
+                kind_label: match r.kind.as_str() {
+                    "income" => "درآمد",
+                    "expense" => "هزینه",
+                    _ => "انتقال",
+                }
+                .into(),
+                account_label: if r.transfer_account_name.is_empty() {
+                    r.account_name.into()
+                } else {
+                    format!("{} ← {}", r.account_name, r.transfer_account_name).into()
+                },
+                amount_label: format_amount(r.amount_minor),
+                category: r.category.into(),
+                occurred_on: r.occurred_on.into(),
+                reference: r.reference.into(),
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+fn fund_check_model(records: Vec<FundCheckRecord>) -> ModelRc<FundCheckData> {
+    ModelRc::new(VecModel::from(
+        records
+            .into_iter()
+            .map(|r| FundCheckData {
+                id: r.id.to_string().into(),
+                direction_label: if r.direction == "incoming" {
+                    "دریافتی"
+                } else {
+                    "پرداختی"
+                }
+                .into(),
+                party_name: r.party_name.into(),
+                account_name: r.account_name.into(),
+                check_number: r.check_number.into(),
+                bank_name: r.bank_name.into(),
+                amount_label: format_amount(r.amount_minor),
+                due_on: r.due_on.into(),
+                status_code: r.status.clone().into(),
+                status_label: match r.status.as_str() {
+                    "upcoming" => "در انتظار",
+                    "cleared" => "وصول/پرداخت‌شده",
+                    "returned" => "برگشتی",
+                    _ => "لغوشده",
+                }
+                .into(),
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn customer_model(mut records: Vec<CustomerRecord>) -> ModelRc<CustomerItemData> {
+    CUSTOMER_SORT.with(|sort| match sort.get() {
+        1 => records.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        2 => records.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase())),
+        3 => records.sort_by_key(|item| std::cmp::Reverse(item.balance_minor)),
+        4 => records.sort_by_key(|item| item.balance_minor),
+        _ => {}
+    });
+    let rows = records
+        .into_iter()
+        .map(|record| {
+            let (status, prefix) = if record.balance_minor > 0 {
+                ("debit", "بدهکار")
+            } else if record.balance_minor < 0 {
+                ("credit", "بستانکار")
+            } else {
+                ("settled", "تسویه")
+            };
+            CustomerItemData {
+                id: record.id.to_string().into(),
+                name: record.name.into(),
+                kind_code: record.kind.clone().into(),
+                kind_label: if record.kind == "individual" {
+                    "حقیقی"
+                } else {
+                    "حقوقی"
+                }
+                .into(),
+                phone: record.phone.into(),
+                email: record.email.into(),
+                address: record.address.into(),
+                balance_label: if record.balance_minor == 0 {
+                    prefix.into()
+                } else {
+                    format!("{prefix} • {}", format_amount(record.balance_minor.abs())).into()
+                },
+                balance_status_code: status.into(),
+                selected: CUSTOMER_SELECTION.with(|items| items.borrow().contains(&record.id)),
+            }
+        })
+        .collect::<Vec<_>>();
+    ModelRc::new(VecModel::from(rows))
+}
+
 fn parse_amount(value: &str) -> Option<i64> {
     let normalized: String = value
         .chars()
@@ -878,6 +1514,16 @@ fn parse_amount(value: &str) -> Option<i64> {
 
 fn format_amount(value: i64) -> SharedString {
     format!("{} ریال", format_number(value)).into()
+}
+
+fn balance_label(value: i64) -> SharedString {
+    if value > 0 {
+        format!("بدهکار • {}", format_amount(value)).into()
+    } else if value < 0 {
+        format!("بستانکار • {}", format_amount(value.abs())).into()
+    } else {
+        "تسویه".into()
+    }
 }
 
 fn format_price_input(value: SharedString, cursor: i32) -> FormattedInput {

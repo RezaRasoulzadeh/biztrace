@@ -1,0 +1,108 @@
+// ui/pages/customer_editor.slint
+
+import { IconButton, BizTraceTheme, RtlButton, RtlCard, RtlHeading, RtlSelectField, RtlText, RtlTextField } from "../components/mod.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export component CustomerEditor inherits Rectangle {
+    in-out property <bool> open;
+    in-out property <string> customer-id;
+    in-out property <string> customer-name;
+    in-out property <string> phone;
+    in-out property <string> email;
+    in-out property <string> address;
+    in-out property <int> kind-index;
+    in property <string> error-message;
+    callback save(string, string, string, string, string, int);
+    callback cancelled;
+    background: #99000000;
+    opacity: root.open ? 1 : 0;
+    visible: root.opacity > 0;
+    animate opacity { duration: 150ms; }
+
+    FocusScope {
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: true;
+        focus-on-tab-navigation: false;
+    }
+
+    card := RtlCard {
+        x: (parent.width - self.width) / 2;
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 18px;
+        width: min(620px, parent.width - 28px);
+        height: min(560px, parent.height - 28px);
+        drop-shadow-color: #99000000;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        animate y { duration: 180ms; easing: ease-out; }
+
+        ScrollView {
+            width: parent.width;
+            height: parent.height;
+
+            VerticalLayout {
+                padding: root.width < 560px ? 16px : 22px;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    height: 38px;
+                    spacing: 10px;
+
+                    IconButton {
+                        icon: @image-url("../../assets/icons/x.svg");
+                        label: "بستن";
+                        clicked => { root.open = false; root.cancelled(); }
+                    }
+
+                    RtlHeading {
+                        horizontal-stretch: 1;
+                        text: root.customer-id.is-empty ? "افزودن مشتری" : "ویرایش مشتری";
+                        font-size: 20px;
+                    }
+                }
+
+                RtlSelectField {
+                    label: "نوع:";
+                    model: ["حقیقی", "حقوقی"];
+                    current-index <=> root.kind-index;
+                }
+
+                RtlTextField { label: "نام:"; text <=> root.customer-name; placeholder-text: "نام مشتری یا کسب‌وکار"; }
+                RtlTextField { label: "تلفن:"; text <=> root.phone; placeholder-text: "اختیاری"; }
+                RtlTextField { label: "ایمیل:"; text <=> root.email; placeholder-text: "اختیاری"; }
+                RtlTextField { label: "آدرس:"; text <=> root.address; placeholder-text: "اختیاری"; }
+
+                if !root.error-message.is-empty : RtlText {
+                    height: 28px;
+                    text: root.error-message;
+                    color: #ff9aaa;
+                    font-size: 12px;
+                }
+
+                Rectangle { vertical-stretch: 1; background: transparent; }
+
+                HorizontalLayout {
+                    height: 40px;
+                    spacing: 10px;
+
+                    RtlButton { width: 120px; text: "انصراف"; icon: @image-url("../../assets/icons/x.svg"); primary: false; clicked => { root.open = false; root.cancelled(); } }
+                    RtlButton {
+                        horizontal-stretch: 1;
+                        text: "ذخیره";
+                        icon: @image-url("../../assets/icons/check.svg");
+                        clicked => {
+                            root.save(
+                                root.customer-id,
+                                root.customer-name,
+                                root.phone,
+                                root.email,
+                                root.address,
+                                root.kind-index
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

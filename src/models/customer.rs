@@ -1,6 +1,6 @@
 // src/models/customer.rs
 
-use super::ModelError;
+use super::{Currency, ModelError, Money};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CustomerId(pub i64);
@@ -21,6 +21,7 @@ pub struct Customer {
     pub address: Option<String>,
     pub tax_id: Option<String>,
     pub notes: Option<String>,
+    pub balance: Money,
     pub active: bool,
 }
 
@@ -43,7 +44,16 @@ impl Customer {
             address: None,
             tax_id: None,
             notes: None,
+            balance: Money::zero(Currency::Irr),
             active: true,
         })
+    }
+
+    pub fn is_debit(&self) -> bool {
+        self.balance.minor_units > 0
+    }
+
+    pub fn is_credit(&self) -> bool {
+        self.balance.minor_units < 0
     }
 }

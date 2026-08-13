@@ -1,9 +1,16 @@
 // src/database/mod.rs
 
 mod catalog;
+mod customer;
+mod fund;
 mod inventory;
 
 pub use catalog::{CatalogDraft, CatalogImportResult, CatalogRecord};
+pub use customer::{CustomerDraft, CustomerRecord};
+pub use fund::{
+    FundAccountDraft, FundAccountRecord, FundCheckDraft, FundCheckRecord, FundTransactionDraft,
+    FundTransactionRecord,
+};
 pub use inventory::{
     InventoryImportResult, InventoryImportRow, InventoryMovementDraft, MovementRecord, StockRecord,
     WarehouseRecord,
@@ -45,6 +52,18 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (
         8,
         include_str!("../../migrations/0008_inventory_history_visibility.sql"),
+    ),
+    (
+        9,
+        include_str!("../../migrations/0009_customer_balances.sql"),
+    ),
+    (
+        10,
+        include_str!("../../migrations/0010_customer_balance_entries.sql"),
+    ),
+    (
+        11,
+        include_str!("../../migrations/0011_fund_management.sql"),
     ),
 ];
 
@@ -138,7 +157,7 @@ impl Database {
     pub fn overview_counts(&self) -> Result<OverviewCounts, DatabaseError> {
         Ok(OverviewCounts {
             invoices: self.count_rows("invoices")?,
-            customers: self.count_rows("customers")?,
+            customers: self.count_active_rows("customers")?,
             catalog_items: self.count_rows("catalog_items")?,
             warehouses: self.count_rows("warehouses")?,
             fund_accounts: self.count_rows("fund_accounts")?,
@@ -149,6 +168,13 @@ impl Database {
 
     fn count_rows(&self, table: &str) -> Result<i32, DatabaseError> {
         let sql = format!("SELECT COUNT(*) FROM {table}");
+        self.connection
+            .query_row(&sql, [], |row| row.get(0))
+            .map_err(DatabaseError::from)
+    }
+
+    fn count_active_rows(&self, table: &str) -> Result<i32, DatabaseError> {
+        let sql = format!("SELECT COUNT(*) FROM {table} WHERE active = 1");
         self.connection
             .query_row(&sql, [], |row| row.get(0))
             .map_err(DatabaseError::from)

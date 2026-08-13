@@ -1,12 +1,98 @@
 // tests/database.rs
 
-use biztrace::database::{CatalogDraft, Database, InventoryImportRow, InventoryMovementDraft};
+use biztrace::database::{
+    CatalogDraft, CustomerDraft, Database, InventoryImportRow, InventoryMovementDraft,
+};
 
 #[test]
 fn initial_schema_is_created_and_versioned() {
     let database = Database::open_in_memory().unwrap();
-    assert_eq!(database.schema_version().unwrap(), 8);
+    assert_eq!(database.schema_version().unwrap(), 10);
     assert_eq!(database.overview_counts().unwrap(), Default::default());
+}
+
+#[test]
+fn customer_balances_preserve_debit_credit_and_settled_values() {
+    let database = Database::open_in_memory().unwrap();
+    for name in ["Debit", "Credit", "Settled"] {
+        let id = database
+            .save_customer(&CustomerDraft {
+                id: None,
+                kind: "individual".into(),
+                name: name.into(),
+                phone: None,
+                email: None,
+                address: None,
+            })
+            .unwrap();
+        let adjustment = match name {
+            "Debit" => 250_000,
+            "Credit" => -125_000,
+            _ => 0,
+        };
+        if adjustment != 0 {
+            database
+                .adjust_customer_balance(id, adjustment, Some("test"))
+                .unwrap();
+        }
+    }
+    let customers = database.customers("").unwrap();
+    assert_eq!(
+        customers
+            .iter()
+            .find(|item| item.name == "Debit")
+            .unwrap()
+            .balance_minor,
+        250_000
+    );
+    assert_eq!(
+        customers
+            .iter()
+            .find(|item| item.name == "Credit")
+            .unwrap()
+            .balance_minor,
+        -125_000
+    );
+    assert_eq!(
+        customers
+            .iter()
+            .find(|item| item.name == "Settled")
+            .unwrap()
+            .balance_minor,
+        0
+    );
+    let debit = customers.iter().find(|item| item.name == "Debit").unwrap();
+    database
+        .save_customer(&CustomerDraft {
+            id: Some(debit.id),
+            kind: debit.kind.clone(),
+            name: "Debit edited".into(),
+            phone: Some("09120000000".into()),
+            email: None,
+            address: None,
+        })
+        .unwrap();
+    assert_eq!(
+        database.customer(debit.id).unwrap().unwrap().balance_minor,
+        250_000
+    );
+    let credit_id = customers
+        .iter()
+        .find(|item| item.name == "Credit")
+        .unwrap()
+        .id;
+    database.settle_customer_balance(credit_id).unwrap();
+    assert_eq!(
+        database.customer(credit_id).unwrap().unwrap().balance_minor,
+        0
+    );
+    let settled_id = customers
+        .iter()
+        .find(|item| item.name == "Settled")
+        .unwrap()
+        .id;
+    database.remove_customer(settled_id).unwrap();
+    assert_eq!(database.overview_counts().unwrap().customers, 2);
 }
 
 #[test]
