@@ -10,9 +10,9 @@ use biztrace::database::{
     FundTransactionRecord, InventoryMovementDraft, MovementRecord, StockRecord, WarehouseRecord,
 };
 use biztrace::import::{
-    read_catalog_excel, read_customer_excel, read_inventory_excel, write_catalog_export,
-    write_catalog_template, write_customer_export, write_customer_template, write_inventory_export,
-    write_inventory_template,
+    FundImportFile, read_catalog_excel, read_customer_excel, read_fund_excel, read_inventory_excel,
+    write_catalog_export, write_catalog_template, write_customer_export, write_customer_template,
+    write_fund_export, write_fund_template, write_inventory_export, write_inventory_template,
 };
 use rfd::AsyncFileDialog;
 use slint::{ModelRc, SharedString, VecModel};
@@ -26,6 +26,7 @@ thread_local! {
     static INVENTORY_SORT: Cell<i32> = const { Cell::new(0) };
     static CUSTOMER_SORT: Cell<i32> = const { Cell::new(0) };
     static CUSTOMER_SELECTION: RefCell<HashSet<i64>> = RefCell::new(HashSet::new());
+    static FUND_ACCOUNT_SELECTION:RefCell<HashSet<i64>>=RefCell::new(HashSet::new());static FUND_TRANSACTION_SELECTION:RefCell<HashSet<i64>>=RefCell::new(HashSet::new());static FUND_CHECK_SELECTION:RefCell<HashSet<i64>>=RefCell::new(HashSet::new());
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,6 +47,222 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.on_catalog_format_price(format_price_input);
     app.on_customer_format_balance(format_price_input);
+    app.on_fund_to_gregorian(|year, month, day| {
+        biztrace::date::jalali_to_gregorian(year, month, day)
+            .unwrap_or_default()
+            .into()
+    });
+    app.on_fund_calendar_day(biztrace::date::jalali_calendar_day);
+    app.global::<DateService>()
+        .on_today_date(|| biztrace::date::today_gregorian().into());
+    app.global::<DateService>()
+        .on_to_gregorian(|year, month, day| {
+            biztrace::date::jalali_to_gregorian(year, month, day)
+                .unwrap_or_default()
+                .into()
+        });
+    app.global::<DateService>()
+        .on_jalali_component(|value, component| {
+            biztrace::date::jalali_component(&value, component)
+        });
+    let weak = app.as_weak();
+    let selection_db = Rc::clone(&database);
+    app.on_fund_selection_changed(move |tab, id, value| {
+        let Some(app) = weak.upgrade() else { return };
+        let Ok(id) = id.parse() else { return };
+        let count = match tab {
+            0 => FUND_ACCOUNT_SELECTION.with(|s| toggle_selection(&mut s.borrow_mut(), id, value)),
+            1 => FUND_TRANSACTION_SELECTION
+                .with(|s| toggle_selection(&mut s.borrow_mut(), id, value)),
+            _ => FUND_CHECK_SELECTION.with(|s| toggle_selection(&mut s.borrow_mut(), id, value)),
+        };
+        app.set_fund_selected_count(count);
+        let _ = refresh_funds(&app, &selection_db, &app.get_fund_search_text());
+    });
+    let weak = app.as_weak();
+    let clear_db = Rc::clone(&database);
+    app.on_fund_clear_selection(move |tab| {
+        let Some(app) = weak.upgrade() else { return };
+        match tab {
+            0 => FUND_ACCOUNT_SELECTION.with(|s| s.borrow_mut().clear()),
+            1 => FUND_TRANSACTION_SELECTION.with(|s| s.borrow_mut().clear()),
+            _ => FUND_CHECK_SELECTION.with(|s| s.borrow_mut().clear()),
+        }
+        app.set_fund_selected_count(0);
+        let _ = refresh_funds(&app, &clear_db, &app.get_fund_search_text());
+    });
+    let weak = app.as_weak();
+    let select_db = Rc::clone(&database);
+    app.on_fund_select_all(move |tab| {
+        let Some(app) = weak.upgrade() else { return };
+        let count = match tab {
+            0 => select_db.fund_accounts().map(|rows| {
+                FUND_ACCOUNT_SELECTION.with(|s| {
+                    s.borrow_mut().extend(rows.iter().map(|r| r.id));
+                    s.borrow().len() as i32
+                })
+            }),
+            1 => select_db
+                .fund_transactions(&app.get_fund_search_text())
+                .map(|rows| {
+                    FUND_TRANSACTION_SELECTION.with(|s| {
+                        s.borrow_mut().extend(rows.iter().map(|r| r.id));
+                        s.borrow().len() as i32
+                    })
+                }),
+            _ => select_db
+                .fund_checks(&app.get_fund_search_text())
+                .map(|rows| {
+                    FUND_CHECK_SELECTION.with(|s| {
+                        s.borrow_mut().extend(rows.iter().map(|r| r.id));
+                        s.borrow().len() as i32
+                    })
+                }),
+        }
+        .unwrap_or(0);
+        app.set_fund_selected_count(count);
+        let _ = refresh_funds(&app, &select_db, &app.get_fund_search_text());
+    });
+    let weak = app.as_weak();
+    let remove_db = Rc::clone(&database);
+    app.on_fund_remove_selected(move |tab| {
+        let Some(app) = weak.upgrade() else { return };
+        match tab {
+            0 => {
+                let ids =
+                    FUND_ACCOUNT_SELECTION.with(|s| s.borrow().iter().copied().collect::<Vec<_>>());
+                for id in ids {
+                    let _ = remove_db.remove_fund_account(id);
+                }
+                FUND_ACCOUNT_SELECTION.with(|s| s.borrow_mut().clear())
+            }
+            1 => {
+                let ids = FUND_TRANSACTION_SELECTION
+                    .with(|s| s.borrow().iter().copied().collect::<Vec<_>>());
+                for id in ids {
+                    let _ = remove_db.remove_fund_transaction(id);
+                }
+                FUND_TRANSACTION_SELECTION.with(|s| s.borrow_mut().clear())
+            }
+            _ => {
+                let ids =
+                    FUND_CHECK_SELECTION.with(|s| s.borrow().iter().copied().collect::<Vec<_>>());
+                for id in ids {
+                    let _ = remove_db.remove_fund_check(id);
+                }
+                FUND_CHECK_SELECTION.with(|s| s.borrow_mut().clear())
+            }
+        }
+        app.set_fund_selected_count(0);
+        let _ = refresh_funds(&app, &remove_db, &app.get_fund_search_text());
+        app.set_status_message("موارد قابل حذف انتخاب‌شده حذف شدند".into());
+        app.set_notification_open(true);
+    });
+    let weak = app.as_weak();
+    app.on_fund_download_template(move |tab| {
+        let weak = weak.clone();
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("ذخیره فایل نمونه امور مالی")
+                .set_file_name(match tab {
+                    0 => "biztrace-fund-accounts-template.xlsx",
+                    1 => "biztrace-fund-transactions-template.xlsx",
+                    _ => "biztrace-fund-checks-template.xlsx",
+                })
+                .add_filter("Excel", &["xlsx"])
+                .save_file()
+                .await
+            else {
+                return;
+            };
+            let Some(app) = weak.upgrade() else { return };
+            match write_fund_template(&xlsx_path(file.path()), tab) {
+                Ok(_) => app.set_status_message("فایل نمونه ذخیره شد".into()),
+                Err(e) => app.set_status_message(format!("ذخیره فایل انجام نشد: {e}").into()),
+            }
+            app.set_notification_open(true);
+        });
+    });
+    let weak = app.as_weak();
+    let fund_import_db = Rc::clone(&database);
+    app.on_fund_import_excel(move |tab| {
+        let weak = weak.clone();
+        let db = Rc::clone(&fund_import_db);
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("انتخاب فایل امور مالی")
+                .add_filter("Excel", &["xlsx", "xls", "ods"])
+                .pick_file()
+                .await
+            else {
+                return;
+            };
+            let result =
+                read_fund_excel(file.path(), tab).and_then(|data| import_fund_data(&db, data));
+            let Some(app) = weak.upgrade() else { return };
+            match result {
+                Ok(count) => {
+                    let _ = refresh_funds(&app, &db, "");
+                    app.set_status_message(format!("{count} ردیف وارد شد").into())
+                }
+                Err(e) => app.set_status_message(format!("ورود اکسل انجام نشد: {e}").into()),
+            }
+            app.set_notification_open(true);
+        });
+    });
+    let weak = app.as_weak();
+    let fund_export_db = Rc::clone(&database);
+    app.on_fund_export_data(move |requested_tab| {
+        let selected_only = requested_tab >= 10;
+        let tab = if selected_only {
+            requested_tab - 10
+        } else {
+            requested_tab
+        };
+        let Ok(mut accounts) = fund_export_db.fund_accounts() else {
+            return;
+        };
+        let Ok(mut transactions) = fund_export_db.fund_transactions("") else {
+            return;
+        };
+        let Ok(mut checks) = fund_export_db.fund_checks("") else {
+            return;
+        };
+        if selected_only {
+            FUND_ACCOUNT_SELECTION.with(|s| accounts.retain(|r| s.borrow().contains(&r.id)));
+            FUND_TRANSACTION_SELECTION
+                .with(|s| transactions.retain(|r| s.borrow().contains(&r.id)));
+            FUND_CHECK_SELECTION.with(|s| checks.retain(|r| s.borrow().contains(&r.id)));
+        }
+        let weak = weak.clone();
+        let _ = slint::spawn_local(async move {
+            let Some(file) = AsyncFileDialog::new()
+                .set_title("ذخیره خروجی امور مالی")
+                .set_file_name(match tab {
+                    0 => "biztrace-fund-accounts.xlsx",
+                    1 => "biztrace-fund-transactions.xlsx",
+                    _ => "biztrace-fund-checks.xlsx",
+                })
+                .add_filter("Excel", &["xlsx"])
+                .save_file()
+                .await
+            else {
+                return;
+            };
+            let Some(app) = weak.upgrade() else { return };
+            match write_fund_export(
+                &xlsx_path(file.path()),
+                tab,
+                &accounts,
+                &transactions,
+                &checks,
+            ) {
+                Ok(_) => app.set_status_message("خروجی ذخیره شد".into()),
+                Err(e) => app.set_status_message(format!("خروجی ذخیره نشد: {e}").into()),
+            }
+            app.set_notification_open(true);
+        });
+    });
 
     let weak = app.as_weak();
     let fund_search_db = Rc::clone(&database);
@@ -106,7 +323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weak = app.as_weak();
     let fund_db = Rc::clone(&database);
     app.on_fund_save_transaction(
-        move |kind, account, target, amount, category, date, reference, description| {
+        move |id, kind, account, target, amount, category, date, reference, description| {
             let Some(app) = weak.upgrade() else { return };
             app.set_fund_editor_error("".into());
             let Ok(accounts) = fund_db.fund_accounts() else {
@@ -140,7 +357,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 reference: (!reference.trim().is_empty()).then(|| reference.trim().into()),
                 description: (!description.trim().is_empty()).then(|| description.trim().into()),
             };
-            match fund_db.save_fund_transaction(&draft) {
+            let result = if id.is_empty() {
+                fund_db.save_fund_transaction(&draft).map(|_| ())
+            } else {
+                id.parse()
+                    .map_err(|_| DatabaseError::Validation("invalid id".into()))
+                    .and_then(|id| fund_db.update_fund_transaction(id, &draft))
+            };
+            match result {
                 Ok(_) => {
                     let _ = refresh_funds(&app, &fund_db, "");
                     app.set_fund_transaction_editor_open(false);
@@ -165,7 +389,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let weak = app.as_weak();
     let fund_db = Rc::clone(&database);
     app.on_fund_save_check(
-        move |direction, account, party, number, bank, amount, due, note| {
+        move |id, direction, account, party, number, bank, amount, due, note| {
             let Some(app) = weak.upgrade() else { return };
             app.set_fund_editor_error("".into());
             let Ok(accounts) = fund_db.fund_accounts() else {
@@ -194,7 +418,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 due_on: due.trim().into(),
                 note: (!note.trim().is_empty()).then(|| note.trim().into()),
             };
-            match fund_db.save_fund_check(&draft) {
+            let result = if id.is_empty() {
+                fund_db.save_fund_check(&draft).map(|_| ())
+            } else {
+                id.parse()
+                    .map_err(|_| DatabaseError::Validation("invalid id".into()))
+                    .and_then(|id| fund_db.update_fund_check(id, &draft))
+            };
+            match result {
                 Ok(_) => {
                     let _ = refresh_funds(&app, &fund_db, "");
                     app.set_fund_check_editor_open(false);
@@ -205,6 +436,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
     );
+    let weak = app.as_weak();
+    let fund_db = Rc::clone(&database);
+    app.on_fund_remove_check(move |id| {
+        let Some(app) = weak.upgrade() else { return };
+        if let Ok(id) = id.parse() {
+            match fund_db.remove_fund_check(id) {
+                Ok(_) => app.set_status_message("چک حذف شد".into()),
+                Err(_) => app.set_status_message("حذف چک انجام نشد".into()),
+            }
+            let _ = refresh_funds(&app, &fund_db, &app.get_fund_search_text());
+            app.set_notification_open(true);
+        }
+    });
     let weak = app.as_weak();
     let fund_db = Rc::clone(&database);
     app.on_fund_check_status(move |id, status| {
@@ -1364,6 +1608,82 @@ fn catalog_model(mut records: Vec<CatalogRecord>) -> ModelRc<CatalogItemData> {
     ModelRc::new(VecModel::from(rows))
 }
 
+fn import_fund_data(database: &Database, data: FundImportFile) -> Result<usize, String> {
+    match data {
+        FundImportFile::Accounts(rows) => {
+            let count = rows.len();
+            for r in rows {
+                database
+                    .save_fund_account(&FundAccountDraft {
+                        id: None,
+                        kind: r.kind,
+                        name: r.name,
+                        account_number: r.number,
+                        opening_balance_minor: r.opening,
+                    })
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(count)
+        }
+        FundImportFile::Transactions(rows) => {
+            let accounts = database.fund_accounts().map_err(|e| e.to_string())?;
+            let count = rows.len();
+            for r in rows {
+                let source = accounts
+                    .iter()
+                    .find(|a| a.name == r.account)
+                    .ok_or_else(|| format!("حساب «{}» پیدا نشد", r.account))?;
+                let target = match r.target {
+                    Some(name) => Some(
+                        accounts
+                            .iter()
+                            .find(|a| a.name == name)
+                            .ok_or_else(|| format!("حساب «{name}» پیدا نشد"))?
+                            .id,
+                    ),
+                    None => None,
+                };
+                database
+                    .save_fund_transaction(&FundTransactionDraft {
+                        account_id: source.id,
+                        transfer_account_id: target,
+                        kind: r.kind,
+                        amount_minor: r.amount,
+                        category: r.category,
+                        occurred_on: r.date,
+                        reference: r.reference,
+                        description: r.description,
+                    })
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(count)
+        }
+        FundImportFile::Checks(rows) => {
+            let accounts = database.fund_accounts().map_err(|e| e.to_string())?;
+            let count = rows.len();
+            for r in rows {
+                let account = accounts
+                    .iter()
+                    .find(|a| a.name == r.account)
+                    .ok_or_else(|| format!("حساب «{}» پیدا نشد", r.account))?;
+                database
+                    .save_fund_check(&FundCheckDraft {
+                        direction: r.direction,
+                        account_id: account.id,
+                        party_name: r.party,
+                        check_number: r.number,
+                        bank_name: r.bank,
+                        amount_minor: r.amount,
+                        due_on: r.due,
+                        note: r.note,
+                    })
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(count)
+        }
+    }
+}
+
 fn refresh_funds(app: &AppWindow, database: &Database, search: &str) -> Result<(), DatabaseError> {
     let accounts = database.fund_accounts()?;
     app.set_fund_account_names(string_model(
@@ -1385,22 +1705,40 @@ fn refresh_funds(app: &AppWindow, database: &Database, search: &str) -> Result<(
                 account_number: a.account_number.clone().into(),
                 opening_value: format_number(a.opening_balance_minor).into(),
                 balance_label: format_amount(a.balance_minor),
+                selected: FUND_ACCOUNT_SELECTION.with(|s| s.borrow().contains(&a.id)),
             })
             .collect::<Vec<_>>(),
     )));
     let transactions = database.fund_transactions(search)?;
-    app.set_fund_transactions(fund_transaction_model(transactions));
+    app.set_fund_transactions(fund_transaction_model(transactions, &accounts));
     let checks = database.fund_checks(search)?;
-    app.set_fund_checks(fund_check_model(checks));
+    app.set_fund_checks(fund_check_model(checks, &accounts));
     app.set_fund_account_count(accounts.len() as i32);
     Ok(())
 }
-fn fund_transaction_model(records: Vec<FundTransactionRecord>) -> ModelRc<FundTransactionData> {
+fn fund_transaction_model(
+    records: Vec<FundTransactionRecord>,
+    accounts: &[FundAccountRecord],
+) -> ModelRc<FundTransactionData> {
     ModelRc::new(VecModel::from(
         records
             .into_iter()
             .map(|r| FundTransactionData {
                 id: r.id.to_string().into(),
+                selected: FUND_TRANSACTION_SELECTION.with(|s| s.borrow().contains(&r.id)),
+                kind_index: match r.kind.as_str() {
+                    "income" => 0,
+                    "expense" => 1,
+                    _ => 2,
+                },
+                account_index: accounts
+                    .iter()
+                    .position(|a| a.name == r.account_name)
+                    .unwrap_or(0) as i32,
+                target_index: accounts
+                    .iter()
+                    .position(|a| a.name == r.transfer_account_name)
+                    .unwrap_or(0) as i32,
                 kind_label: match r.kind.as_str() {
                     "income" => "درآمد",
                     "expense" => "هزینه",
@@ -1413,19 +1751,30 @@ fn fund_transaction_model(records: Vec<FundTransactionRecord>) -> ModelRc<FundTr
                     format!("{} ← {}", r.account_name, r.transfer_account_name).into()
                 },
                 amount_label: format_amount(r.amount_minor),
+                amount_value: format_number(r.amount_minor).into(),
                 category: r.category.into(),
                 occurred_on: r.occurred_on.into(),
                 reference: r.reference.into(),
+                description: r.description.into(),
             })
             .collect::<Vec<_>>(),
     ))
 }
-fn fund_check_model(records: Vec<FundCheckRecord>) -> ModelRc<FundCheckData> {
+fn fund_check_model(
+    records: Vec<FundCheckRecord>,
+    accounts: &[FundAccountRecord],
+) -> ModelRc<FundCheckData> {
     ModelRc::new(VecModel::from(
         records
             .into_iter()
             .map(|r| FundCheckData {
                 id: r.id.to_string().into(),
+                selected: FUND_CHECK_SELECTION.with(|s| s.borrow().contains(&r.id)),
+                direction_index: if r.direction == "incoming" { 0 } else { 1 },
+                account_index: accounts
+                    .iter()
+                    .position(|a| a.name == r.account_name)
+                    .unwrap_or(0) as i32,
                 direction_label: if r.direction == "incoming" {
                     "دریافتی"
                 } else {
@@ -1437,6 +1786,7 @@ fn fund_check_model(records: Vec<FundCheckRecord>) -> ModelRc<FundCheckData> {
                 check_number: r.check_number.into(),
                 bank_name: r.bank_name.into(),
                 amount_label: format_amount(r.amount_minor),
+                amount_value: format_number(r.amount_minor).into(),
                 due_on: r.due_on.into(),
                 status_code: r.status.clone().into(),
                 status_label: match r.status.as_str() {
@@ -1446,6 +1796,7 @@ fn fund_check_model(records: Vec<FundCheckRecord>) -> ModelRc<FundCheckData> {
                     _ => "لغوشده",
                 }
                 .into(),
+                note: r.note.into(),
             })
             .collect::<Vec<_>>(),
     ))
@@ -1510,6 +1861,14 @@ fn parse_amount(value: &str) -> Option<i64> {
         return None;
     }
     normalized.parse().ok()
+}
+fn toggle_selection(selection: &mut HashSet<i64>, id: i64, value: bool) -> i32 {
+    if value {
+        selection.insert(id);
+    } else {
+        selection.remove(&id);
+    }
+    selection.len() as i32
 }
 
 fn format_amount(value: i64) -> SharedString {

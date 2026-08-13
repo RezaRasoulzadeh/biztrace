@@ -8,12 +8,14 @@ export component RtlSelectField inherits Rectangle {
     in property <[string]> model;
     in-out property <int> current-index;
     callback selected(string);
-    min-height: root.width < 520px ? 78px : 34px;
+    height: root.width < 520px ? 78px : 40px;
 
     if root.width >= 520px : HorizontalLayout {
+        height: 40px;
         spacing: 12px;
 
         RtlSelect {
+            height: 40px;
             horizontal-stretch: 1;
             model: root.model;
             current-index <=> root.current-index;

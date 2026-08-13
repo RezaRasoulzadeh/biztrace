@@ -1,14 +1,105 @@
 // tests/database.rs
 
 use biztrace::database::{
-    CatalogDraft, CustomerDraft, Database, InventoryImportRow, InventoryMovementDraft,
+    CatalogDraft, CustomerDraft, Database, FundAccountDraft, FundCheckDraft, FundTransactionDraft,
+    InventoryImportRow, InventoryMovementDraft,
 };
 
 #[test]
 fn initial_schema_is_created_and_versioned() {
     let database = Database::open_in_memory().unwrap();
-    assert_eq!(database.schema_version().unwrap(), 10);
-    assert_eq!(database.overview_counts().unwrap(), Default::default());
+    assert_eq!(database.schema_version().unwrap(), 12);
+    assert_eq!(database.overview_counts().unwrap().fund_accounts, 1);
+    assert_eq!(database.fund_accounts().unwrap()[0].name, "صندوق اصلی");
+}
+
+#[test]
+fn funds_track_account_balances_transactions_and_upcoming_checks() {
+    let database = Database::open_in_memory().unwrap();
+    let bank = database
+        .save_fund_account(&FundAccountDraft {
+            id: None,
+            kind: "bank".into(),
+            name: "Main bank".into(),
+            account_number: Some("123".into()),
+            opening_balance_minor: 1_000_000,
+        })
+        .unwrap();
+    let cash = database
+        .save_fund_account(&FundAccountDraft {
+            id: None,
+            kind: "cash".into(),
+            name: "Cash".into(),
+            account_number: None,
+            opening_balance_minor: 0,
+        })
+        .unwrap();
+    database
+        .save_fund_transaction(&FundTransactionDraft {
+            account_id: bank,
+            transfer_account_id: None,
+            kind: "income".into(),
+            amount_minor: 500_000,
+            category: "sale".into(),
+            occurred_on: "2026-08-13".into(),
+            reference: Some("TRX-1".into()),
+            description: None,
+        })
+        .unwrap();
+    database
+        .save_fund_transaction(&FundTransactionDraft {
+            account_id: bank,
+            transfer_account_id: Some(cash),
+            kind: "transfer".into(),
+            amount_minor: 200_000,
+            category: "cash refill".into(),
+            occurred_on: "2026-08-14".into(),
+            reference: Some("TRX-2".into()),
+            description: None,
+        })
+        .unwrap();
+    let accounts = database.fund_accounts().unwrap();
+    assert_eq!(
+        accounts
+            .iter()
+            .find(|a| a.id == bank)
+            .unwrap()
+            .balance_minor,
+        1_300_000
+    );
+    assert_eq!(
+        accounts
+            .iter()
+            .find(|a| a.id == cash)
+            .unwrap()
+            .balance_minor,
+        200_000
+    );
+    let check = database
+        .save_fund_check(&FundCheckDraft {
+            direction: "outgoing".into(),
+            account_id: bank,
+            party_name: "Supplier".into(),
+            check_number: "CHK-1".into(),
+            bank_name: Some("Main".into()),
+            amount_minor: 300_000,
+            due_on: "2026-09-01".into(),
+            note: None,
+        })
+        .unwrap();
+    assert_eq!(database.fund_checks("").unwrap()[0].status, "upcoming");
+    database.set_fund_check_status(check, "cleared").unwrap();
+    assert_eq!(database.fund_checks("").unwrap()[0].status, "cleared");
+    assert_eq!(
+        database
+            .fund_accounts()
+            .unwrap()
+            .iter()
+            .find(|account| account.id == bank)
+            .unwrap()
+            .balance_minor,
+        1_000_000
+    );
 }
 
 #[test]

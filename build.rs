@@ -25,7 +25,7 @@ fn main() {
         }
     }
     source.push_str(&format!(
-        "export {{ AppWindow }} from \"{}\";\n",
+        "export {{ AppWindow, DateService }} from \"{}\";\n",
         slint_path(&app)
     ));
 

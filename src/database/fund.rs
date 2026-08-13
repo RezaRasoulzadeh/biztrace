@@ -85,6 +85,14 @@ impl Database {
         if d.name.trim().is_empty() || d.opening_balance_minor < 0 {
             return Err(DatabaseError::Validation("invalid account".into()));
         }
+        if d.kind == "cash" && d.account_number.is_some() {
+            return Err(DatabaseError::Validation(
+                "cash account cannot have an account number".into(),
+            ));
+        }
+        if !matches!(d.kind.as_str(), "cash" | "bank" | "card" | "other") {
+            return Err(DatabaseError::Validation("invalid account kind".into()));
+        }
         if let Some(id) = d.id {
             self.connection.execute("UPDATE fund_accounts SET kind=?1,name=?2,account_number=?3,opening_balance_minor=?4,updated_at=CURRENT_TIMESTAMP WHERE id=?5 AND active=1",params![d.kind,d.name,d.account_number,d.opening_balance_minor,id])?;
             Ok(id)
@@ -126,7 +134,7 @@ impl Database {
         .collect::<Result<Vec<_>, _>>()?)
     }
     pub fn save_fund_transaction(&self, d: &FundTransactionDraft) -> Result<i64, DatabaseError> {
-        if d.amount_minor <= 0 || d.category.trim().is_empty() || d.occurred_on.trim().is_empty() {
+        if d.amount_minor <= 0 || d.category.trim().is_empty() || !valid_iso_date(&d.occurred_on) {
             return Err(DatabaseError::Validation("invalid transaction".into()));
         }
         self.connection.execute("INSERT INTO fund_transactions(account_id,transfer_account_id,kind,amount_minor,currency,category,occurred_on,reference,description,created_by)VALUES(?1,?2,?3,?4,'IRR',?5,?6,?7,?8,(SELECT id FROM users ORDER BY id LIMIT 1))",params![d.account_id,d.transfer_account_id,d.kind,d.amount_minor,d.category,d.occurred_on,d.reference,d.description])?;
@@ -135,6 +143,17 @@ impl Database {
     pub fn remove_fund_transaction(&self, id: i64) -> Result<(), DatabaseError> {
         self.connection
             .execute("DELETE FROM fund_transactions WHERE id=?1", [id])?;
+        Ok(())
+    }
+    pub fn update_fund_transaction(
+        &self,
+        id: i64,
+        d: &FundTransactionDraft,
+    ) -> Result<(), DatabaseError> {
+        if d.amount_minor <= 0 || d.category.trim().is_empty() || !valid_iso_date(&d.occurred_on) {
+            return Err(DatabaseError::Validation("invalid transaction".into()));
+        }
+        self.connection.execute("UPDATE fund_transactions SET account_id=?1,transfer_account_id=?2,kind=?3,amount_minor=?4,category=?5,occurred_on=?6,reference=?7,description=?8,updated_at=CURRENT_TIMESTAMP WHERE id=?9",params![d.account_id,d.transfer_account_id,d.kind,d.amount_minor,d.category,d.occurred_on,d.reference,d.description,id])?;
         Ok(())
     }
     pub fn fund_checks(&self, search: &str) -> Result<Vec<FundCheckRecord>, DatabaseError> {
@@ -160,9 +179,19 @@ impl Database {
         if d.amount_minor <= 0
             || d.party_name.trim().is_empty()
             || d.check_number.trim().is_empty()
-            || d.due_on.trim().is_empty()
+            || !valid_iso_date(&d.due_on)
         {
             return Err(DatabaseError::Validation("invalid check".into()));
+        }
+        let account_kind: String = self.connection.query_row(
+            "SELECT kind FROM fund_accounts WHERE id=?1 AND active=1",
+            [d.account_id],
+            |r| r.get(0),
+        )?;
+        if account_kind == "cash" {
+            return Err(DatabaseError::Validation(
+                "checks require a bank or card account".into(),
+            ));
         }
         self.connection.execute("INSERT INTO fund_checks(direction,account_id,party_name,check_number,bank_name,amount_minor,due_on,note)VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![d.direction,d.account_id,d.party_name,d.check_number,d.bank_name,d.amount_minor,d.due_on,d.note])?;
         Ok(self.connection.last_insert_rowid())
@@ -171,10 +200,61 @@ impl Database {
         if !matches!(status, "upcoming" | "cleared" | "returned" | "cancelled") {
             return Err(DatabaseError::Validation("invalid status".into()));
         }
-        self.connection.execute(
+        let transaction = self.connection.unchecked_transaction()?;
+        let (direction, account_id, amount, due_on, party, current) = transaction.query_row(
+            "SELECT direction,account_id,amount_minor,due_on,party_name,status FROM fund_checks WHERE id=?1",
+            [id], |r| Ok((r.get::<_,String>(0)?,r.get::<_,i64>(1)?,r.get::<_,i64>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?)))?;
+        if current != "upcoming" {
+            return Err(DatabaseError::Validation(
+                "check is already finalized".into(),
+            ));
+        }
+        transaction.execute(
             "UPDATE fund_checks SET status=?1,updated_at=CURRENT_TIMESTAMP WHERE id=?2",
             params![status, id],
         )?;
+        if status == "cleared" {
+            transaction.execute("INSERT INTO fund_transactions(account_id,kind,amount_minor,currency,category,occurred_on,reference,description) VALUES(?1,?2,?3,'IRR',?4,?5,?6,?7)",params![account_id,if direction=="incoming"{"income"}else{"expense"},amount,"چک",due_on,format!("CHECK-{id}"),format!("تسویه چک {party}")])?;
+        }
+        transaction.commit()?;
         Ok(())
     }
+    pub fn update_fund_check(&self, id: i64, d: &FundCheckDraft) -> Result<(), DatabaseError> {
+        let transaction = self.connection.unchecked_transaction()?;
+        let status: String =
+            transaction.query_row("SELECT status FROM fund_checks WHERE id=?1", [id], |r| {
+                r.get(0)
+            })?;
+        transaction.execute("UPDATE fund_checks SET direction=?1,account_id=?2,party_name=?3,check_number=?4,bank_name=?5,amount_minor=?6,due_on=?7,note=?8,updated_at=CURRENT_TIMESTAMP WHERE id=?9",params![d.direction,d.account_id,d.party_name,d.check_number,d.bank_name,d.amount_minor,d.due_on,d.note,id])?;
+        if status == "cleared" {
+            transaction.execute("UPDATE fund_transactions SET account_id=?1,kind=?2,amount_minor=?3,occurred_on=?4,description=?5,updated_at=CURRENT_TIMESTAMP WHERE reference=?6",params![d.account_id,if d.direction=="incoming"{"income"}else{"expense"},d.amount_minor,d.due_on,format!("تسویه چک {}",d.party_name),format!("CHECK-{id}")])?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+    pub fn remove_fund_check(&self, id: i64) -> Result<(), DatabaseError> {
+        let transaction = self.connection.unchecked_transaction()?;
+        transaction.execute(
+            "DELETE FROM fund_transactions WHERE reference=?1",
+            [format!("CHECK-{id}")],
+        )?;
+        transaction.execute("DELETE FROM fund_checks WHERE id=?1", [id])?;
+        transaction.commit()?;
+        Ok(())
+    }
+}
+
+fn valid_iso_date(value: &str) -> bool {
+    let parts = value.split('-').collect::<Vec<_>>();
+    if parts.len() != 3 || parts[0].len() != 4 || parts[1].len() != 2 || parts[2].len() != 2 {
+        return false;
+    }
+    let (Ok(year), Ok(month), Ok(day)) = (
+        parts[0].parse::<i32>(),
+        parts[1].parse::<u8>(),
+        parts[2].parse::<u8>(),
+    ) else {
+        return false;
+    };
+    crate::models::Date::new(year, month, day).is_ok()
 }

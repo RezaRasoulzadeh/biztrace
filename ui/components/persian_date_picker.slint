@@ -1,0 +1,80 @@
+import { BizTraceTheme } from "theme.slint";
+import { RtlText } from "rtl_text.slint";
+import { BizTraceIcon } from "biztrace_icon.slint";
+
+export global DateService {
+    callback to-gregorian(int, int, int) -> string;
+    callback today-date() -> string;
+    pure callback jalali-component(string, int) -> int;
+}
+
+export component PersianDatePicker inherits Rectangle {
+    in property <string> label;
+    in-out property <string> value;
+    in-out property <int> year: 1405;
+    in-out property <int> month: 1;
+    in-out property <int> day: 1;
+    callback to-gregorian(int, int, int) -> string;
+    pure callback calendar-day(int, int, int) -> int;
+    property <bool> picker-open;
+    property <[int]> cells: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41];
+    property <[string]> month-names: ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
+    height: root.picker-open ? 390px : 66px;
+    background: transparent;
+
+    function select-value(date: string) {
+        root.value = date;
+        root.year = DateService.jalali-component(date, 0);
+        root.month = DateService.jalali-component(date, 1);
+        root.day = DateService.jalali-component(date, 2);
+    }
+
+    VerticalLayout {
+        spacing: 6px;
+        RtlText { height: 20px; text: root.label; font-size: 12px; color: BizTraceTheme.text-muted; }
+        Rectangle {
+            height: 40px;
+            background: BizTraceTheme.control;
+            border-color: BizTraceTheme.border;
+            border-width: 1px;
+            border-radius: 7px;
+            HorizontalLayout {
+                padding: 10px;
+                BizTraceIcon { width: 18px; height: 18px; source: @image-url("../../assets/icons/calendar-days.svg"); tint: BizTraceTheme.text-muted; }
+                RtlText { horizontal-stretch: 1; text: root.value.is-empty ? "انتخاب تاریخ شمسی" : root.year + " / " + root.month + " / " + root.day; color: root.value.is-empty ? BizTraceTheme.text-faint : BizTraceTheme.text; }
+            }
+            TouchArea { clicked => { if !root.picker-open { root.select-value(root.value.is-empty ? DateService.today-date() : root.value); } root.picker-open = !root.picker-open; } }
+        }
+        if root.picker-open : Rectangle {
+            height: 314px;
+            background: BizTraceTheme.surface-raised;
+            border-color: BizTraceTheme.border;
+            border-width: 1px;
+            border-radius: 9px;
+            VerticalLayout {
+                padding: 10px;
+                spacing: 7px;
+                HorizontalLayout {
+                    height: 36px;
+                    spacing: 5px;
+                    Rectangle { width: 34px; background: BizTraceTheme.control; border-radius: 6px; RtlText { text: "‹"; horizontal-alignment: center; font-size: 22px; } TouchArea { clicked => { if root.month == 1 { root.month = 12; root.year -= 1; } else { root.month -= 1; } } } }
+                    RtlText { horizontal-stretch: 1; text: root.month-names[root.month - 1] + " " + root.year; horizontal-alignment: center; font-weight: 700; }
+                    Rectangle { width: 34px; background: BizTraceTheme.control; border-radius: 6px; RtlText { text: "›"; horizontal-alignment: center; font-size: 22px; } TouchArea { clicked => { if root.month == 12 { root.month = 1; root.year += 1; } else { root.month += 1; } } } }
+                    Rectangle { width: 58px; background: BizTraceTheme.control; border-radius: 6px; RtlText { text: "امروز"; horizontal-alignment: center; font-size: 12px; font-weight: 600; } TouchArea { clicked => { root.select-value(DateService.today-date()); root.picker-open = false; } } }
+                }
+                HorizontalLayout { height: 22px; for name in ["ش","ی","د","س","چ","پ","ج"] : RtlText { horizontal-stretch: 1; text: name; horizontal-alignment: center; color: BizTraceTheme.text-faint; font-size: 11px; } }
+                GridLayout {
+                    height: 216px;
+                    spacing: 3px;
+                    for cell[index] in root.cells : Rectangle {
+                        row: Math.floor(index / 7); col: Math.mod(index, 7);
+                        background: root.calendar-day(root.year, root.month, cell) == root.day ? BizTraceTheme.brand : day-touch.has-hover ? BizTraceTheme.control-hover : transparent;
+                        border-radius: 6px;
+                        RtlText { text: root.calendar-day(root.year, root.month, cell) == 0 ? "" : root.calendar-day(root.year, root.month, cell); horizontal-alignment: center; color: root.calendar-day(root.year, root.month, cell) == root.day ? white : BizTraceTheme.text; }
+                        day-touch := TouchArea { enabled: root.calendar-day(root.year, root.month, cell) > 0; clicked => { root.day = root.calendar-day(root.year, root.month, cell); root.value = root.to-gregorian(root.year, root.month, root.day); root.picker-open = false; } }
+                    }
+                }
+            }
+        }
+    }
+}
